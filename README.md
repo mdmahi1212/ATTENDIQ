@@ -42,6 +42,15 @@ Every app has a committed `.env.example`. Copy it to `.env` (Python apps, repo r
 `.env.local` (web) and fill it in. Never commit real values. The Supabase service-role key
 lives only in `apps/web` server code.
 
+## Database (Phase 1)
+
+- Migrations: `supabase/migrations/` (apply with `npx supabase db push` after `npx supabase link`).
+- Seed: `supabase/seed.sql` (demo university, room B204, 30 simulated students; idempotent).
+- Tests: `scripts\test-db.ps1` (pgTAP, each file rolled back) and `scripts\test-db.ps1 -Replay`
+  (drops everything, replays all migrations + seed from zero, checks, rolls back).
+  Needs `SUPABASE_DB_URL` in the repo-root `.env`.
+- Device keys: `scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply]`.
+
 ## Quick start
 
 Filled in as phases complete (see PROGRESS.md). Final fresh-laptop guide lands in Phase 8.

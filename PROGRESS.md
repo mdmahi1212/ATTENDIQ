@@ -6,8 +6,8 @@ Last updated: 2026-11-18
 
 | Phase | Status | Gate |
 |---|---|---|
-| 0 Preflight | DONE — skeleton committed | tools ✅, skeleton committed ✅, .env.example per app ✅; waiting on Supabase project details for Phase 1 |
-| 1 Database | not started | |
+| 0 Preflight | DONE (commit b0295a4) | tools ✅, skeleton ✅, .env.example per app ✅ |
+| 1 Database | DONE — waiting for "continue" | see Gate 1 below |
 | 2 Web foundation | not started | |
 | 3 PWA + push + deploy | not started | |
 | 4 Face API + enrollment | not started | |
@@ -16,37 +16,77 @@ Last updated: 2026-11-18
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
 
+## Gate 1 results (2026-11-18)
+
+| Check | Result | How |
+|---|---|---|
+| Migrations apply cleanly from zero | ✅ PASS | Inside one transaction: dropped every object we create (0 tables / 0 functions / 0 extensions left), replayed all 5 migrations + seed, checked, rolled back. Result: 31 tables all with RLS, 52 policies, 38 functions, cron job, 4 Realtime tables, 32 profiles (30 SIM), geofence check true/false, a tick created + started a session. |
+| All SQL tests pass | ✅ 91/91 | `supabase/tests/rule_engine.test.sql` (pgTAP, rolled back) — every edge case in the build prompt list, plus tick/holiday/lock, gallery, face match, finalize fail-safe, RLS |
+| RLS: student JWT cannot read another student's attendance | ✅ PASS | tests 81–91 (student, professor, anon roles via `set local role` + JWT claims) |
+| Types generated into `apps/web/lib/database.types.ts` | ✅ | Supabase type generator |
+| pg_cron really runs | ✅ | `cron.job_run_details` shows `session_tick()` succeeding every minute; it created today's IOT401 session |
+
+How the tests were run: through the Supabase connector (same SQL text as the files). `scripts/test-db.ps1` runs the
+identical files through `scripts/db/run-sql.mjs`; that runner is **NOT VERIFIED against the DB yet** because the
+repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checked and fails cleanly without the URL.
+
+## Supabase project
+
+- Project: **ATTENDIQ**, ref `vvdiqvcsevrhvgfezdru`, region `ap-northeast-1` (Tokyo — Seoul was requested; latency difference is negligible).
+- Postgres 17. Extensions: vector 0.8.2, postgis 3.3.7, pg_cron 1.6.4, pg_net 0.20.4, pgcrypto 1.3 (all in schema `extensions`, pg_cron in `pg_catalog`).
+- Migrations were applied via the Supabase connector; local file names match the recorded versions, so `npx supabase db push` will see them as applied.
+- Seed was loaded once (idempotent; safe to re-run).
+- A function `public.rls_auto_enable()` exists that we did not create (project default). The security advisor flags it as callable by anon. Left untouched — decide in Phase 8 security pass.
+
 ## Toolchain (checked 2026-11-18)
 
-| Tool | Found | Notes |
+| Tool | Version | Notes |
 |---|---|---|
-| node | v24.19.0 | OK (≥ 20) |
-| npm | 11.17.0 | OK |
-| python (default) | 3.15.2 | NOT used for this project |
-| python 3.11 | 3.11.9 via `py -3.11` | OK — create every venv with `py -3.11 -m venv .venv` |
-| git | 2.56.0.windows.4 | installed via winget 2026-11-18; repo identity set locally (user.name `mahiimran353`, change with `git config user.name`) |
-| Supabase CLI | 3.2.0 (`npx supabase`) | OK |
-| Docker | NOT INSTALLED | optional; without it SQL tests run via `scripts/test-db.ps1` against the linked project |
-| mosquitto | 2.1.2 | winget; at `C:\Program Files\mosquitto` (NOT on PATH — scripts use `MOSQUITTO_DIR`). Installed as a Windows service, running, auto-start, default config (localhost only). Phase 5 replaces the config with password + ACL |
-| cloudflared | 2026.11.0 | winget |
+| node | v24.19.0 | |
+| npm | 11.17.0 | |
+| python 3.11 | 3.11.9 via `py -3.11` | default `python` is 3.15 — always create venvs with `py -3.11 -m venv .venv` |
+| git | 2.56.0.windows.4 | repo-local identity `mahiimran353` |
+| Supabase CLI | 3.2.0 (`npx supabase`) | `supabase/config.toml` from `supabase init` |
+| Docker | not installed | optional; SQL tests use the rolled-back-transaction runner instead |
+| mosquitto | 2.1.2 | `C:\Program Files\mosquitto` (not on PATH). Windows service running, default config (localhost only) until Phase 5 |
+| cloudflared | 2026.11.0 | |
 
 ## Resolved library versions
 
-None yet (recorded per phase).
+| Package | Version | Where |
+|---|---|---|
+| pg | 8.23.1 (pinned) | `scripts/db` (SQL test runner) |
+| pgTAP | 1.3.3 | created inside each test transaction, never persisted |
 
-## Decisions taken in Phase 0
+## Database design notes (Phase 1)
 
-- Repo path is `C:\dev\smart-attendence-system` (no spaces — OK; differs from the suggested `C:\dev\smart-attendance`).
-- Secrets for the edge go in `apps/edge/.env`; non-secret tuning in `apps/edge/config.yaml` (gitignored, example ships in Phase 5).
-- Recorded sample videos (`apps/edge/samples/`) and face eval sets (`eval/`) are gitignored: they contain real faces.
-- `apps/web/.env.example` already exists; during Phase 2 it is moved aside while `create-next-app` scaffolds into `apps/web`, then restored.
+- **Event storage:** every edge envelope goes into `edge_events` (idempotency ledger, `event_id` PK). Gate events and occupancy samples are also projected into typed `gate_events` / `occupancy_samples`. Heartbeats + camera status live only in `edge_events`.
+- **Roles:** `profiles.role` comes ONLY from `raw_app_meta_data.role` (set by service role / admin invite). `raw_user_meta_data` is client-controlled at sign-up, so reading the role from it (as the build prompt said) would let anyone sign up as admin. Tested (test 1).
+- **QR secret** lives in `session_secrets` (RLS on, no policies) so no client role can ever read it.
+- **Fail-safe at finalize:** `pending → absent` only if (a) some room device sent an event during the session AND (b) the gate camera was offline ≤ 50 % of the on-time window. Otherwise students stay `pending` with flag `needs_review`.
+- **Status rule:** earliest trusted evidence wins; rank present > late > absent(very_late) > pending; late/old replayed events can upgrade but never downgrade; excused / left_early / manual / appeal marks are never touched by evidence. Self-verify inside the FIRST mismatch window = present.
+- **Recheck:** only students recorded in `verification_targets` (actually sent the recheck) can become `left_early`.
+- **Clock:** every engine function takes `p_now` for tests; when called by a signed-in client it is forced to `now()`.
+- **Device keys:** `sha256(utf8(key))` as lowercase hex in `edge_devices.api_key_hash`. Key format `sadev_` + 43 base64url chars.
+- **Added beyond the spec:** `pending_enrollments` (email invites converted on sign-up), `verification_targets`, `holidays`, `session_secrets`, `policy.late_weight = 1`, `attendance_evidence.id`, evidence source `engine`.
+- **Seed fixed UUIDs** (for simulator/tests) are listed at the top of `supabase/seed.sql`.
 
-## Open issues / questions for the user
+## How to run
 
-See the Phase 0 report in chat; answers get recorded here.
+- SQL tests: `scripts\test-db.ps1` (add `-Replay` for the from-zero replay). Needs `SUPABASE_DB_URL` in the repo-root `.env`.
+- New device key: `scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply]`.
+- Regenerate types: `npx supabase gen types typescript --linked > apps/web/lib/database.types.ts` (after `npx supabase login` + `link`).
+
+## Open issues / later phases
+
+- `private.app_config` (`app_url`, `push_webhook_secret`) is empty until Phase 3; the push webhook trigger is a no-op until then (in-app inbox still works).
+- Admin + professor have no password yet (seeded without one). Phase 2 adds a script to set them via the admin API.
+- Professor manual mark RPC + appeal decision RPC: Phase 7.
+- `apps/web/` now contains `.env.example` and `lib/database.types.ts`; Phase 2 moves them aside while `create-next-app` scaffolds, then restores them.
 
 ## Manual steps the user must do
 
 1. ~~Install Git, Mosquitto, cloudflared~~ (done).
-2. Create the Supabase project (Seoul) and send: project ref, URL, anon key, service-role key, DB password.
-3. Vercel account linked to GitHub (Phase 3). Cloudflare account (Phase 4).
+2. Copy `.env.example` → `.env` at the repo root and fill `SUPABASE_PROJECT_REF=vvdiqvcsevrhvgfezdru`, `SUPABASE_DB_PASSWORD`, `SUPABASE_DB_URL` (Dashboard → Connect → Session pooler). Then run `scripts\test-db.ps1 -Replay` once.
+3. Copy `apps/web/.env.example` → `apps/web/.env.local` and fill the Supabase URL, anon key and service-role key (needed in Phase 2).
+4. Vercel account linked to GitHub (Phase 3). Cloudflare account (Phase 4).

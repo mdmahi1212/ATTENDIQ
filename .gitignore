@@ -1,0 +1,64 @@
+# --- Dependencies / build output ---
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# --- Secrets (every app ships a committed .env.example instead) ---
+.env*
+!.env.example
+*.pem
+*.key
+firmware/esp32-door-led/secrets.h
+apps/edge/config.yaml
+
+# --- Local data / queues / logs ---
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+logs/
+*.log
+
+# --- MQTT broker credentials ---
+infra/mosquitto/passwd
+infra/mosquitto/*.pem
+infra/mosquitto/data/
+
+# --- ML models and biometric data (never commit faces) ---
+models/
+*.onnx
+*.pt
+eval/
+apps/edge/samples/*
+!apps/edge/samples/.gitkeep
+
+# --- Supabase CLI local state ---
+supabase/.temp/
+supabase/.branches/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json

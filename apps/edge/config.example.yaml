@@ -21,6 +21,16 @@ gate:
   margin: 0.08
   min_votes: 2
 
+inside:
+  enabled: true
+  interval_s: 3               # YOLOv8n every 3 s
+  publish_s: 10               # OCCUPANCY_UPDATED every 10 s
+  conf: 0.4
+  window: 10                  # median of the last 10 samples
+  stable_count_seconds: 60    # 'stable' = unchanged for 60 s (only stable counts trigger alerts)
+  rotate: 0
+  roi: [[0.0, 0.3], [1.0, 0.3], [1.0, 1.0], [0.0, 1.0]]   # seat area; feet outside it are ignored
+
 heartbeat_seconds: 15
 gallery_refresh_seconds: 60   # re-fetch the session gallery (students who enroll during class)
 control_poll_seconds: 15      # fallback HTTP poll of the current session if no MQTT control arrives

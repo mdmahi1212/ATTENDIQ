@@ -60,9 +60,9 @@ export default async function AdminDashboard() {
         <ul className="divide-y rounded-lg border">
           {(sessions.data ?? []).map((s) => (
             <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-              <span>
+              <Link href={`/sessions/${s.id}`} className="font-medium underline-offset-2 hover:underline">
                 {s.sections?.courses?.code}-{s.sections?.section_no} · room {s.rooms?.code ?? "—"}
-              </span>
+              </Link>
               <span className="text-muted-foreground">
                 {fmtSeoul(s.starts_at, "HH:mm")}–{fmtSeoul(s.ends_at, "HH:mm")}
               </span>

@@ -20,7 +20,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from attendiq_common import topics
 from attendiq_common.api import EdgeApi
-from simulator.script import build_events, load
+from attendiq_common.envelope import Envelope, EventType
+from simulator.script import build_events, final_inside, load
 
 
 class Settings(BaseSettings):
@@ -46,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--direct", action="store_true", help="POST to the web API instead of MQTT")
     run.add_argument("--realtime", action="store_true", help="start the class now and play events on the clock")
     run.add_argument("--speed", type=float, default=1.0, help="with --realtime: 10 = ten times faster")
+    run.add_argument("--hold-minutes", type=float, default=0,
+                     help="after the script, keep publishing the live inside count (stable) for N minutes")
     args = ap.parse_args(argv)
 
     s = Settings()  # type: ignore[call-arg]
@@ -89,16 +92,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.realtime:
         for e in events:
-            wait = (e.observed_at - datetime.now(UTC)).total_seconds() / args.speed
+            wait = (e.observed_at - (datetime.now(UTC) + timedelta(seconds=api.clock_offset))).total_seconds() / args.speed
             if wait > 0:
                 time.sleep(wait)
-            send([e.model_copy(update={"observed_at": datetime.now(UTC)}) if args.speed != 1 else e])
+            server_now = datetime.now(UTC) + timedelta(seconds=api.clock_offset)
+            send([e.model_copy(update={"observed_at": server_now}) if args.speed != 1 else e])
     else:
-        future = [e for e in events if e.observed_at > datetime.now(UTC) + timedelta(seconds=30)]
+        server_now = datetime.now(UTC) + timedelta(seconds=api.clock_offset)  # never trust the laptop clock
+        future = [e for e in events if e.observed_at > server_now + timedelta(seconds=30)]
         if future:
             log.error("%d events would be in the future; script too long for replay", len(future))
             return 2
         send(events)
+    if args.hold_minutes > 0:
+        # The rule engine only trusts a FRESH stable count (<= 2 min old): keep the room "occupied" in real time.
+        count = final_inside(script)
+        end = time.monotonic() + args.hold_minutes * 60
+        log.info("holding inside count %d for %.1f min", count, args.hold_minutes)
+        while time.monotonic() < end:
+            now = datetime.now(UTC) + timedelta(seconds=api.clock_offset)  # server time
+            payload = {"raw": count, "smoothed": count, "stable": True}
+            send([Envelope(event_type=EventType.OCCUPANCY_UPDATED, source_device_id=uuid.UUID(s.sim_device_id),
+                           session_id=uuid.UUID(session["id"]), observed_at=now, model_version="simulator@1",
+                           payload=payload, simulation=True)])
+            time.sleep(10)
     if client:
         client.loop_stop()
         client.disconnect()

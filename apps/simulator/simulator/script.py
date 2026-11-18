@@ -38,6 +38,7 @@ class StudentGroup(BaseModel):
     reenter: float | None = None
     expect: str
     flags: list[str] = Field(default_factory=list)
+    missed: bool = False  # inside the room but the gate camera did not recognise them (mask, group, angle)
 
     @field_validator("expect")
     @classmethod
@@ -126,7 +127,13 @@ def build_events(script: Script, t0: datetime, device_id: uuid.UUID, session_id:
             sid = sim_student(n)
             if arrive is None:
                 continue
-            enter(arrive, sid)
+            if g.missed:
+                track += 1
+                ev(arrive, EventType.GATE_PERSON_IN, {"track_id": track})
+                unknown = {"track_id": track, "score": round(rng.uniform(0.2, 0.4), 3), "votes": 1}
+                ev(arrive + 0.01, EventType.GATE_ENTRY_UNKNOWN, unknown)
+            else:
+                enter(arrive, sid)
             inside[arrive] = inside.get(arrive, 0) + 1
             if g.leave is not None:
                 leave(g.leave, sid)
@@ -153,3 +160,18 @@ def build_events(script: Script, t0: datetime, device_id: uuid.UUID, session_id:
     for e in rng.sample(gate, min(script.duplicates, len(gate))):
         ordered.append(e)  # identical event_id: the server must ignore it
     return ordered
+
+
+def final_inside(script: Script) -> int:
+    """People inside at the end of the script (students + visitors + 1 professor), as the inside camera sees it."""
+    n = 1 + len(script.visitors)
+    for g in script.students:
+        for t in g.arrival_times():
+            if t is None:
+                continue
+            n += 1
+            if g.leave is not None:
+                n -= 1
+            if g.reenter is not None:
+                n += 1
+    return n

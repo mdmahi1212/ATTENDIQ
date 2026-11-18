@@ -28,6 +28,8 @@ class Env(BaseSettings):
     mqtt_tls: bool = False
     mqtt_ca_file: str = ""
     gate_camera_source: str = "0"
+    inside_camera_source: str = ""  # "" = no inside camera on this node
+    yolo_weights: str = "yolov8n.pt"
     outbox_path: str = "./data/outbox.db"
     insightface_home: str = "./models"
     log_level: str = "INFO"
@@ -57,9 +59,22 @@ class GateYaml(BaseModel):
                           model_version=f"buffalo_l / thr-{self.accept}")
 
 
+class InsideYaml(BaseModel):
+    enabled: bool = True
+    interval_s: float = 3.0          # run YOLO every N seconds
+    publish_s: float = 10.0          # OCCUPANCY_UPDATED every N seconds
+    conf: float = 0.4
+    window: int = 10                 # median over the last N samples
+    stable_count_seconds: float = 60.0
+    rotate: int = 0
+    # Seat area polygon in normalised coords (0..1); people whose feet are outside it are not counted.
+    roi: list[tuple[float, float]] = [(0.0, 0.3), (1.0, 0.3), (1.0, 1.0), (0.0, 1.0)]
+
+
 class EdgeYaml(BaseModel):
     room_code: str | None = None
     gate: GateYaml = GateYaml()
+    inside: InsideYaml = InsideYaml()
     heartbeat_seconds: float = 15
     gallery_refresh_seconds: float = 60
     control_poll_seconds: float = 15

@@ -1,0 +1,10 @@
+# Gate 6 scenario: the gate camera MISSES 3 students who are in the room (C > V -> verify request).
+# Run with:  python -m simulator run --script scripts/mismatch.yaml --direct --hold-minutes 3
+name: mismatch
+minutes: 75
+occupancy_every_min: 1
+students:
+  - {ids: "01-20", arrive: [-5, 8], expect: present}
+  - {ids: "21-25", arrive: [12, 20], expect: late}
+  - {ids: "26-28", arrive: [3, 6], missed: true, expect: pending}   # in the room, not recognised
+  - {ids: "29-30", expect: pending}                                 # not in the room

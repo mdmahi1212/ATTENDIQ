@@ -1,10 +1,10 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/app-shell";
 import { StateBadge } from "@/components/state-badge";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fmtSeoul, hhmm, seoulToday, weekdayLabel } from "@/lib/time";
 
-// Live dashboard, review queue and session reports arrive in Phase 6/7.
 export default async function ProfessorHome() {
   const user = await requireRole("professor");
   const supabase = await createClient();
@@ -17,15 +17,15 @@ export default async function ProfessorHome() {
   ]);
   return (
     <>
-      <PageHeader title="My sections" description="The live class dashboard arrives in Phase 6." />
+      <PageHeader title="My sections" description="Open today's class for the live dashboard." />
       <h2 className="mb-2 font-semibold">Today</h2>
       <ul className="mb-6 divide-y rounded-lg border text-sm">
         {(today ?? []).length === 0 && <li className="px-3 py-2 text-muted-foreground">No classes today.</li>}
         {(today ?? []).map((s) => (
           <li key={s.id} className="flex items-center justify-between px-3 py-2">
-            <span>
+            <Link href={`/sessions/${s.id}`} className="font-medium underline-offset-2 hover:underline">
               {s.sections?.courses?.code}-{s.sections?.section_no} · {fmtSeoul(s.starts_at, "HH:mm")}–{fmtSeoul(s.ends_at, "HH:mm")}
-            </span>
+            </Link>
             <StateBadge state={s.state} />
           </li>
         ))}

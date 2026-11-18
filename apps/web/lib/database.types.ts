@@ -1447,6 +1447,15 @@ export type Database = {
       is_request_target: { Args: { p_request: string }; Returns: boolean }
       is_section_staff: { Args: { p_section: string }; Returns: boolean }
       is_session_staff: { Args: { p_session: string }; Returns: boolean }
+      manual_mark: {
+        Args: {
+          p_reason: string
+          p_session: string
+          p_status: Database["public"]["Enums"]["att_status"]
+          p_student: string
+        }
+        Returns: undefined
+      }
       match_face: {
         Args: { p_embedding: string; p_student: string }
         Returns: number

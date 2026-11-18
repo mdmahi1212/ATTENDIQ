@@ -12,9 +12,33 @@ Last updated: 2026-11-18
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
 | 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
 | 5 Edge + MQTT + ingest + simulator | LIVE TEST PASSED — only the recorded-video check is open | see Gate 5 below |
-| 6 Occupancy + live dashboard + self-verify | not started | |
+| 6 Occupancy + live dashboard + self-verify | BUILT — gate needs the user's live test (phone) | see Gate 6 below |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
+
+## Gate 6 status (2026-11-18)
+
+| Check | Result |
+|---|---|
+| **Simulator: C > V sends verify_now only to pending students** | ✅ `scripts/mismatch.yaml` (gate camera "misses" 3 students who are inside) + live count held 3 min: at 12:11:00 the pg_cron tick saw C = 28 > V = 25 and opened one `mismatch` request whose targets are exactly the 5 pending students (26-30), 0 present/late targets. Simulated students get no notification rows by design (`notify_user` skips them); pgTAP test D covers the real-student notifications |
+| web vitest | ✅ 103 (new: rotating QR token incl. slot edges/forgery/wrong session, verify decision rule, live counters/mismatch banner) |
+| Playwright e2e | ✅ 9/9 (new: live session page shows counters + roster and a gate event turns a row Present **without reload** via Realtime; room QR renders; verify/QR APIs refuse anonymous callers) |
+| SQL tests | ✅ 95/95 rule engine + **9/9 `manual_mark`** (no-JWT refused, other professor refused, student refused, reason required, `pending` not settable, audited with professor as actor + reason, evidence row, student notified) |
+| edge / ingest / simulator / pycommon pytest | ✅ 31 / 7 / 9 / 5 (new: seat-ROI by bottom-centre, median smoothing, stability timer, **real YOLOv8n on a 6-person photo**) · ruff clean |
+| lint / typecheck / build | ✅ |
+| **LIVE: hide face at gate -> push -> verify with QR + face -> `present` (self_verify)** | ⏳ NOT VERIFIED — needs the deployed build + phone |
+| **LIVE: a printed photo fails liveness** | ⏳ NOT VERIFIED — needs the user |
+
+### Phase 6 decisions / notes
+- Self-verify = `/verify/[requestId]`: GPS (high accuracy, 15 s) -> rear-camera QR scan (html5-qrcode 2.3.8) -> front camera 2-step random liveness (same MediaPipe module as enrollment) -> one straight-on JPEG -> `POST /api/verify/[requestId]`. Server: window open + eligible (target, or pending in a non-recheck window) + max 3 attempts + face profile active, face-api `/embed` + `match_face` >= `verify_threshold` (0.50), QR HMAC (current or previous 20 s slot, `timingSafeEqual`), PostGIS `check_geofence`, rule face AND liveness AND (QR OR GPS-inside-and-accurate), QR mandatory when `rooms.require_qr`. Attempt stored in `verification_attempts`; a pass goes through `apply_self_verification` (camera-miss rule: first mismatch window = present). "Request manual check" flags the row `manual_check` and notifies the staff.
+- QR token format `aiq1.<session>.<slot>.<base64url HMAC>`; the projector page (`/sessions/[id]/qr`) gets tokens from the server (server time; it corrects for a wrong laptop clock) and redraws on rotation.
+- Live session page `/sessions/[id]` (professor of the section or admin; route guard + RLS): V / C / Enrolled, mismatch banner (same rule as `run_count_checks`, stable counts only), device health chips (edge heartbeat + gate camera frame age, read with the service role after RLS proved staff access), open windows, roster with method / first seen / went-out / re-entered / manual-check markers, manual mark with mandatory reason (migration 12 `manual_mark`), send verify request (kind `manual`), start recheck, end session (`finalize_session`), review queue (failed attempts with reasons, manual-check requests, needs-review rows). Updates via Realtime (attendance, occupancy_samples, verification_requests) -> `router.refresh()`. Linked from the professor home and the admin dashboard.
+- Occupancy: `edge/occupancy.py` YOLOv8n (Ultralytics 8.4.215, CPU torch 2.15.0) every 3 s on the inside camera, persons whose **bottom-centre** is inside the seat ROI, median of 10, stable after 60 s unchanged, `OCCUPANCY_UPDATED` every 10 s; `--debug` writes `data/inside-debug.jpg` (opencv-headless has no window). Weights in `apps/edge/models/yolov8n.pt` (gitignored).
+- The DB only trusts a stable count <= 2 min old, so the simulator got `--hold-minutes` (live count) and `missed: true` students (inside but not recognised). The simulator now also uses the server clock offset (the laptop clock is ~2.5 min slow).
+- Not built yet (Phase 7): session report + CSV, unknown-entrant snapshots.
+
+### Phase 6 versions
+qrcode 1.5.4 (+ @types/qrcode 1.5.6) · html5-qrcode 2.3.8 · ultralytics 8.4.215 · torch 2.15.0+cpu / torchvision 0.29.2+cpu · YOLOv8n weights v8.4.0 release
 
 ## Gate 5 status (2026-11-18) — live test passed
 

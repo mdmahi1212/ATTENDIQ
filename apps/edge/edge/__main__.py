@@ -37,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--direct", action="store_true", help="POST events to the API instead of MQTT")
     ap.add_argument("--presence", action="store_true", help="entry_mode=presence (overrides config.yaml)")
     ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], help="rotate gate frames clockwise (overrides config.yaml)")
+    ap.add_argument("--no-inside", action="store_true", help="do not run the inside (occupancy) camera")
+    ap.add_argument("--debug", action="store_true", help="write the annotated inside frame to data/inside-debug.jpg")
     args = ap.parse_args(argv)
 
     env = Env()  # type: ignore[call-arg]
@@ -178,6 +180,41 @@ def main(argv: list[str] | None = None) -> int:
     log.info("detector ready; room %s; source %s; mode %s; rotate %s", room, source, gate_cfg.entry_mode,
              args.rotate if args.rotate is not None else cfg.gate.rotate)
 
+    def occupancy_loop(cam: Camera) -> None:
+        from edge.occupancy import OccupancyCounter, YoloPersonDetector, annotate, in_roi
+
+        yolo = YoloPersonDetector(str(resolve(env.yolo_weights)) if resolve(env.yolo_weights).exists() else env.yolo_weights,
+                                  cfg.inside.conf)
+        counter = OccupancyCounter(cfg.inside.window, cfg.inside.stable_count_seconds)
+        session_seen = None
+        next_pub = 0.0
+        log.info("inside camera ready (%s), roi %s", env.inside_camera_source, cfg.inside.roi)
+        while not stop.is_set():
+            t = time.monotonic()
+            if gate.session_id != session_seen:
+                session_seen = gate.session_id
+                counter.reset()
+            _, frame, _ = cam.latest()
+            if frame is not None and gate.session_id is not None:
+                frame = rotate_frame(frame, cfg.inside.rotate)
+                boxes = yolo(frame)
+                kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
+                sample = counter.add(len(kept), t)
+                inside_stats.update(raw=sample.raw, smoothed=sample.smoothed, stable=sample.stable)
+                if args.debug:
+                    import cv2
+
+                    dbg = annotate(frame, boxes, kept, cfg.inside.roi, sample.smoothed)
+                    cv2.imwrite(str(resolve("./data/inside-debug.jpg")), dbg)
+                if t >= next_pub:
+                    next_pub = t + cfg.inside.publish_s
+                    emit(Envelope(event_type=EventType.OCCUPANCY_UPDATED, source_device_id=device_id, session_id=gate.session_id,
+                                  observed_at=server_now(), model_version="yolov8n",
+                                  payload={"raw": sample.raw, "smoothed": sample.smoothed, "stable": sample.stable}))
+            stop.wait(max(0.1, cfg.inside.interval_s - (time.monotonic() - t)))
+
+    inside_stats: dict[str, Any] = {}
+
     # ------------------------------------------------------------ heartbeat + session poll
     def background() -> None:
         next_hb, next_poll, next_gallery = 0.0, 0.0, time.monotonic() + cfg.gallery_refresh_seconds
@@ -204,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
                     log.warning("laptop clock is %.0f s %s server time: sync Windows time (timestamps are corrected)",
                                 abs(off), "behind" if off > 0 else "ahead of")
                 emit(Envelope(event_type=EventType.EDGE_HEARTBEAT, source_device_id=device_id, observed_at=server_now(), payload={
-                    "clock_offset_s": round(off, 1),
+                    "clock_offset_s": round(off, 1), "inside": inside_stats,
                     "cpu": psutil.cpu_percent(), "fps": {"gate": round(camera.fps, 1)},
                     "frame_age_s": {"gate": None if age is None else round(age, 1)},
                     "outbox": outbox.pending_count(), "gallery": len(gallery),
@@ -212,6 +249,13 @@ def main(argv: list[str] | None = None) -> int:
             stop.wait(0.5)
 
     threading.Thread(target=background, daemon=True, name="background").start()
+
+    # ------------------------------------------------------------ inside camera (occupancy)
+    inside_cam: Camera | None = None
+    if cfg.inside.enabled and env.inside_camera_source and not args.no_inside and not args.video:
+        inside_cam = Camera("inside", env.inside_camera_source, on_camera)
+        inside_cam.start()
+        threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
 
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
@@ -237,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         stop.set()
         camera.stop()
+        if inside_cam:
+            inside_cam.stop()
         for tr in gate.tracker.clear():  # decide tracks still open at shutdown
             if tr.direction == "in" and not tr.decided:
                 gate._decide(tr)

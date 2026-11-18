@@ -27,6 +27,8 @@ const GUARDS: { prefix: string; roles: readonly Role[] }[] = [
   { prefix: "/operator", roles: ["operator", "admin"] },
   { prefix: "/professor", roles: ["professor"] },
   { prefix: "/student", roles: ["student"] },
+  { prefix: "/sessions", roles: ["professor", "admin"] },
+  { prefix: "/verify", roles: ["student"] },
 ];
 
 export const PUBLIC_PATHS = ["/login", "/signup", "/reset-password", "/auth/confirm", "/forbidden"];

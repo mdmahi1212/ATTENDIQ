@@ -67,3 +67,22 @@ def test_duplicate_students_rejected() -> None:
     s = Script.model_validate({"name": "x", "students": [{"ids": "01", "expect": "pending"}, {"ids": "01", "expect": "present"}]})
     with pytest.raises(ValueError):
         s.expected()
+
+
+def test_mismatch_script_counts_missed_students_inside_but_not_recognised() -> None:
+    from simulator.script import final_inside
+
+    s = load(DEMO.parent / "mismatch.yaml")
+    evs = build_events(s, T0, DEV, SESS)
+    rec = {e.payload["student_id"] for e in evs if e.event_type == EventType.GATE_ENTRY_RECOGNISED}
+    assert len(rec) == 25 and str(sim_student(26)) not in rec
+    assert sum(e.event_type == EventType.GATE_ENTRY_UNKNOWN for e in evs) == 3
+    assert final_inside(s) == 1 + 28  # professor + 25 recognised + 3 missed
+    occ = max((e for e in evs if e.event_type == EventType.OCCUPANCY_UPDATED), key=lambda e: e.observed_at)
+    assert occ.payload["raw"] == 29
+
+
+def test_final_inside_demo() -> None:
+    from simulator.script import final_inside
+
+    assert final_inside(load(DEMO)) == 28

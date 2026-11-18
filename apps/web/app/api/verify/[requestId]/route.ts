@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { ALL_CHALLENGES } from "@/lib/face/liveness";
-import { embedImages, FaceApiError } from "@/lib/face-api";
+import { embedImages, FaceApiError, requireLiveness } from "@/lib/face-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decideVerification, MAX_ATTEMPTS, type VerifyReason } from "@/lib/verify/decision";
 import { verifyQrToken } from "@/lib/verify/qr";
@@ -64,8 +64,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
 
   // Face 1:1
   let faceScore: number | null = null;
+  let passiveLive: boolean | null = null;
+  let liveScore: number | null = null;
   try {
     const [r] = await embedImages([frame]);
+    passiveLive = r?.live ?? null;
+    liveScore = r?.live_score ?? null;
     if (r?.ok && r.embedding) {
       const { data: sim, error } = await admin.rpc("match_face", { p_student: user.id, p_embedding: JSON.stringify(r.embedding) });
       if (error) throw new Error(error.message);
@@ -101,6 +105,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
     faceScore,
     faceThreshold: policyNum(rc.session.policy, "verify_threshold", 0.5),
     livenessOk: meta.data.liveness.passed && meta.data.liveness.challenges.length >= 2,
+    passiveLive,
+    requirePassiveLive: requireLiveness(),
     qrOk,
     requireQr: rc.requireQr,
     gpsInside,
@@ -115,7 +121,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
       student_id: user.id,
       device_id: request.headers.get("user-agent")?.slice(0, 120) ?? null,
       face_score: faceScore,
-      liveness_ok: meta.data.liveness.passed,
+      liveness_ok: meta.data.liveness.passed && passiveLive === true,
+      live_score: liveScore,
       lat: lat ?? null,
       lng: lng ?? null,
       gps_accuracy_m: accuracy ?? null,
@@ -136,7 +143,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
     if (!a?.applied) return fail(409, a?.reason === "window_closed" ? "The window closed just now." : "Could not apply the verification.", { code: a?.reason });
     status = a.status ?? null;
   }
-  console.log(JSON.stringify({ at: "verify", student: user.id, request: requestId, pass: decision.pass, reasons: decision.reasons, face: faceScore, qr: qrOk, gps: gpsInside }));
+  console.log(JSON.stringify({ at: "verify", student: user.id, request: requestId, pass: decision.pass, reasons: decision.reasons, face: faceScore, live: liveScore, qr: qrOk, gps: gpsInside }));
   return NextResponse.json({
     ok: true,
     pass: decision.pass,

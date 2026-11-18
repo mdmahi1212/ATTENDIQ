@@ -20,6 +20,7 @@ class FakeFace:
     bbox: np.ndarray
     det_score: float
     _emb: np.ndarray = field(default_factory=lambda: _unit(512, 1))
+    liveness: dict | None = None
 
     @property
     def normed_embedding(self) -> np.ndarray:

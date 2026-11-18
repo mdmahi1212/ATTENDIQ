@@ -1221,6 +1221,7 @@ export type Database = {
           gps_ok: boolean | null
           id: string
           lat: number | null
+          live_score: number | null
           liveness_ok: boolean | null
           lng: number | null
           qr_ok: boolean | null
@@ -1237,6 +1238,7 @@ export type Database = {
           gps_ok?: boolean | null
           id?: string
           lat?: number | null
+          live_score?: number | null
           liveness_ok?: boolean | null
           lng?: number | null
           qr_ok?: boolean | null
@@ -1253,6 +1255,7 @@ export type Database = {
           gps_ok?: boolean | null
           id?: string
           lat?: number | null
+          live_score?: number | null
           liveness_ok?: boolean | null
           lng?: number | null
           qr_ok?: boolean | null

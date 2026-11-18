@@ -14,7 +14,7 @@ def files(*blobs: bytes) -> list[tuple[str, tuple[str, bytes, str]]]:
 def test_health_reports_model(client) -> None:
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "model_loaded": True, "model": "fake", "version": "1.0.0"}
+    assert r.json() == {"status": "ok", "model_loaded": True, "model": "fake", "liveness": False, "version": "1.1.0"}
 
 
 def test_embed_requires_secret(client) -> None:

@@ -1,7 +1,7 @@
 """Stateless face API: images in -> embeddings + quality out. No database credentials here.
 
 POST /embed   multipart field "images" (1..MAX files), header X-Face-Api-Secret
-GET  /health  {status, model_loaded, model, version}
+GET  /health  {status, model_loaded, model, liveness, version}
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from app.config import Settings, get_settings
 from app.engine import FaceEngine, InsightFaceEngine
 from app.quality import EmbedResult, Limits, decode_image, evaluate
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 log = logging.getLogger("face_api")
 
 
@@ -28,7 +28,7 @@ def create_app(engine_factory: Callable[[Settings], FaceEngine] | None = None, s
     logging.basicConfig(level=cfg.log_level, format=log_format)
 
     def default_factory(s: Settings) -> FaceEngine:
-        return InsightFaceEngine(s.insightface_model, s.insightface_home, s.det_size)
+        return InsightFaceEngine(s.insightface_model, s.insightface_home, s.det_size, s.liveness_enabled, s.liveness_threshold)
 
     factory = engine_factory or default_factory
 
@@ -54,6 +54,7 @@ def create_app(engine_factory: Callable[[Settings], FaceEngine] | None = None, s
             "status": "ok" if engine else "loading",
             "model_loaded": engine is not None,
             "model": getattr(engine, "model_name", None),
+            "liveness": bool(getattr(engine, "liveness", False)),
             "version": VERSION,
         }
 

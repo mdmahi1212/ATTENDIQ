@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { CONSENT_VERSION } from "@/lib/consent";
 import { duplicateDecision, enrollMetaSchema, MAX_IMAGE_BYTES, MIN_GOOD_IMAGES, selectEmbeddings, type DuplicateHit } from "@/lib/face/enroll";
-import { embedImages, FACE_MODEL_VERSION, FaceApiError } from "@/lib/face-api";
+import { embedImages, FACE_MODEL_VERSION, FaceApiError, requireLiveness } from "@/lib/face-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     return fail(503, "The face service is offline right now. Please try again later.", { code });
   }
 
-  const { kept, dropped } = selectEmbeddings(results, meta.data.poses);
+  const { kept, dropped } = selectEmbeddings(results, meta.data.poses, requireLiveness());
   if (kept.length < MIN_GOOD_IMAGES) {
     return fail(422, `Only ${kept.length} of ${images.length} photos were usable (need ${MIN_GOOD_IMAGES}). Try better light and hold the phone at eye level.`, { dropped });
   }

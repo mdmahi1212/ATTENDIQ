@@ -31,6 +31,14 @@ function secret(): string {
   return s;
 }
 
+/**
+ * Passive anti-spoofing is required unless explicitly turned off (FACE_REQUIRE_LIVENESS=false, dev only):
+ * enrollment drops non-live photos and self-verify fails without a live verdict.
+ */
+export function requireLiveness(): boolean {
+  return process.env.FACE_REQUIRE_LIVENESS?.trim().toLowerCase() !== "false";
+}
+
 /** Stored in face_profiles.model_version so a model change can force re-enrollment. */
 export const FACE_MODEL_VERSION = "insightface-buffalo_l";
 

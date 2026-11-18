@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     min_blur_laplacian_var: float = 60.0
     max_image_bytes: int = 4_000_000
     max_images_per_request: int = 12
+    # Passive anti-spoofing (InsightFace liveness addon): live_score per image, is_live = score >= threshold.
+    liveness_enabled: bool = True
+    liveness_threshold: float = 0.8
 
     log_level: str = "INFO"
 

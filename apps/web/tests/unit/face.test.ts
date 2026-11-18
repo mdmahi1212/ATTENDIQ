@@ -232,7 +232,7 @@ describe("pose capture plan", () => {
 // ---------------------------------------------------------------- server rules
 describe("enrollment rules", () => {
   const person = unit(1);
-  const good = (v: number[], det = 0.8): FaceApiResult => ({ ok: true, embedding: v, det_score: det, face_px: 200, blur: 120 });
+  const good = (v: number[], det = 0.8): FaceApiResult => ({ ok: true, embedding: v, det_score: det, face_px: 200, blur: 120, live: true, live_score: 0.99 });
 
   it("keeps good, consistent images and reports rejected ones with reasons", () => {
     const results: FaceApiResult[] = [
@@ -249,6 +249,17 @@ describe("enrollment rules", () => {
       { index: 1, pose: "front", reason: "too_blurry" },
       { index: 4, pose: "right", reason: "inconsistent" },
     ]);
+  });
+
+  it("photos that are not live (print / screen) are dropped; unclear liveness too; can be relaxed for dev", () => {
+    const r = [good(near(person, 0.8, 21)), { ...good(near(person, 0.8, 22)), live: false, live_score: 0.03 }, { ...good(near(person, 0.8, 23)), live: null, live_score: null }];
+    const { kept, dropped } = selectEmbeddings(r, ["front", "front", "left"]);
+    expect(kept.map((k) => k.index)).toEqual([0]);
+    expect(dropped).toEqual([
+      { index: 1, pose: "front", reason: "not_live" },
+      { index: 2, pose: "left", reason: "liveness_unclear" },
+    ]);
+    expect(selectEmbeddings(r, ["front", "front", "left"], false).kept).toHaveLength(3);
   });
 
   it("mean vector is unit length", () => {

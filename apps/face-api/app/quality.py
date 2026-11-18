@@ -35,9 +35,12 @@ class EmbedResult:
     blur: float | None = None
     embedding: list[float] | None = None
     reason: str | None = None
+    live: bool | None = None  # None = liveness not evaluated (addon off) or the crop was rejected
+    live_score: float | None = None
 
     def to_dict(self) -> dict[str, object]:
-        out: dict[str, object] = {"ok": self.ok, "det_score": self.det_score, "face_px": self.face_px, "blur": self.blur}
+        out: dict[str, object] = {"ok": self.ok, "det_score": self.det_score, "face_px": self.face_px, "blur": self.blur,
+                                  "live": self.live, "live_score": self.live_score}
         if self.embedding is not None:
             out["embedding"] = self.embedding
         if self.reason is not None:
@@ -82,7 +85,11 @@ def evaluate(img: np.ndarray, faces: Sequence[DetectedFace], limits: Limits) -> 
     face_px = int(round(x2 - x1))
     det_score = round(float(face.det_score), 4)
     blur = round(laplacian_variance(img, face.bbox), 2)
-    base = {"det_score": det_score, "face_px": face_px, "blur": blur}
+    lv = getattr(face, "liveness", None) or {}
+    score = lv.get("live_score") if isinstance(lv, dict) else None
+    base = {"det_score": det_score, "face_px": face_px, "blur": blur,
+            "live": lv.get("is_live") if isinstance(lv, dict) else None,
+            "live_score": None if score is None else round(float(score), 4)}
     if face_px < limits.min_face_px:
         return EmbedResult(ok=False, reason="face_too_small", **base)
     if det_score < limits.min_det_score:

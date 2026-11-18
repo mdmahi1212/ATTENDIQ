@@ -41,6 +41,8 @@ describe("self-verify decision", () => {
     faceScore: 0.7,
     faceThreshold: 0.5,
     livenessOk: true,
+    passiveLive: true,
+    requirePassiveLive: true,
     qrOk: true,
     requireQr: true,
     gpsInside: true,
@@ -70,6 +72,13 @@ describe("self-verify decision", () => {
     expect(decideVerification({ ...opt, gpsInside: false }).reasons).toEqual(["qr_missing", "gps_outside"]);
     expect(decideVerification({ ...opt, gpsInside: null, gpsAccuracyM: null }).reasons).toEqual(["qr_missing", "gps_missing"]);
     expect(decideVerification({ ...opt, gpsInside: false, qrOk: true }).pass).toBe(true);
+  });
+
+  it("a printed photo that fooled the browser challenges still fails on the server anti-spoof check", () => {
+    // Live test 2026-11-18: a printed photo passed the blink/turn challenges (eyes covered = "blink").
+    expect(decideVerification({ ...base, passiveLive: false })).toMatchObject({ pass: false, reasons: ["spoof_suspected"] });
+    expect(decideVerification({ ...base, passiveLive: null }).reasons).toEqual(["liveness_unclear"]);
+    expect(decideVerification({ ...base, passiveLive: null, requirePassiveLive: false }).pass).toBe(true);
   });
 
   it("threshold boundary is inclusive", () => {

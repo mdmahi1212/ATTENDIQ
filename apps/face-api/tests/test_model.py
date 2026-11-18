@@ -22,7 +22,7 @@ LIM = Limits(min_face_px=80, min_det_score=0.6, min_blur=60.0)
 def engine():
     from app.engine import InsightFaceEngine
 
-    return InsightFaceEngine("buffalo_l", str(ROOT / "models"), 640)
+    return InsightFaceEngine("buffalo_l", str(ROOT / "models"), 640, liveness=True)
 
 
 @pytest.fixture(scope="module")
@@ -93,3 +93,11 @@ def test_same_person_scores_higher_than_different_people(engine, group, boxes) -
     assert same > 0.6, same
     assert others and max(others) < 0.35, others
     assert same - max(others) > 0.3
+
+
+def test_liveness_addon_scores_real_faces_as_live(engine, group, boxes) -> None:  # noqa: ANN001
+    from app.quality import Limits, evaluate
+
+    img = crop(group, boxes[0])
+    res = evaluate(img, engine.detect(img), Limits(80, 0.6, 30.0)).to_dict()
+    assert res["live_score"] is not None and res["live"] is True, res

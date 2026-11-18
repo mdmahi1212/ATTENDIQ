@@ -29,6 +29,8 @@ export const faceApiResultSchema = z.array(
     face_px: z.number().nullable().optional(),
     blur: z.number().nullable().optional(),
     reason: z.string().optional(),
+    live: z.boolean().nullable().optional(), // passive anti-spoof verdict (null = not evaluated / crop rejected)
+    live_score: z.number().nullable().optional(),
   }),
 );
 export type FaceApiResult = z.infer<typeof faceApiResultSchema>[number];
@@ -53,13 +55,14 @@ export type Dropped = { index: number; pose: string; reason: string };
  * Keeps the face-api's good images, then drops any that do not match the rest
  * (e.g. someone else stepped into one frame). Returns what to store and what was rejected.
  */
-export function selectEmbeddings(results: FaceApiResult[], poses: string[]): { kept: Kept[]; dropped: Dropped[] } {
+export function selectEmbeddings(results: FaceApiResult[], poses: string[], requireLive = true): { kept: Kept[]; dropped: Dropped[] } {
   const dropped: Dropped[] = [];
   let kept: Kept[] = [];
   results.forEach((r, index) => {
     const pose = poses[index] ?? "unknown";
-    if (r.ok && r.embedding) kept.push({ index, pose, embedding: r.embedding, det_score: r.det_score ?? 0 });
-    else dropped.push({ index, pose, reason: r.reason ?? "rejected" });
+    if (!r.ok || !r.embedding) dropped.push({ index, pose, reason: r.reason ?? "rejected" });
+    else if (requireLive && r.live !== true) dropped.push({ index, pose, reason: r.live === false ? "not_live" : "liveness_unclear" });
+    else kept.push({ index, pose, embedding: r.embedding, det_score: r.det_score ?? 0 });
   });
   if (kept.length >= 2) {
     const mean = meanVector(kept.map((k) => k.embedding));
@@ -89,5 +92,7 @@ export const REJECTION_TEXT: Record<string, string> = {
   image_too_large: "image too large",
   inconsistent: "did not match your other photos",
   bad_embedding: "could not read the face",
+  not_live: "looked like a photo or a screen, not a live face",
+  liveness_unclear: "face too close to the edge to check it is live",
   rejected: "rejected",
 };

@@ -86,3 +86,22 @@ def test_final_inside_demo() -> None:
     from simulator.script import final_inside
 
     assert final_inside(load(DEMO)) == 28
+
+
+def test_expected_final_and_compare() -> None:
+    from simulator.script import compare, expected_final
+
+    exp = expected_final(load(DEMO))
+    assert sum(e["status"] == "absent" for e in exp.values()) == 3  # the 3 no-shows after finalize
+    perfect = [{"student_id": str(k), "status": v["status"], "flags": v["flags"] + ["very_late_noise"]} for k, v in exp.items()]
+    assert compare(exp, perfect) == []  # untracked flags are ignored
+    wrong = [dict(a) for a in perfect]
+    wrong[0]["status"] = "late"
+    wrong[26]["flags"] = []
+    probs = compare(exp, wrong[:-1])
+    assert len(probs) == 3 and any("missing" in p for p in probs)
+
+
+def test_demo_fits_finalize_mode() -> None:
+    s = load(DEMO)
+    assert s.last_minute + 1 <= s.minutes - 1

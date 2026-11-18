@@ -19,7 +19,7 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="border-b bg-muted/30 md:w-56 md:shrink-0 md:border-r md:border-b-0">
+      <aside className="border-b bg-muted/30 md:w-56 md:shrink-0 md:border-r md:border-b-0 print:hidden">
         <div className="flex items-center justify-between px-4 py-3 md:block">
           <Link href="/" className="font-semibold">
             Smart Attendance
@@ -29,7 +29,7 @@ export function AppShell({
         <NavLinks items={nav} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end gap-3 border-b px-4 py-2 text-sm">
+        <header className="flex items-center justify-end gap-3 border-b px-4 py-2 text-sm print:hidden">
           <NotificationBell userId={user.id} />
           <span className="truncate text-muted-foreground" data-testid="current-user">
             {user.fullName} · {user.role}
@@ -45,7 +45,7 @@ export function AppShell({
             </Button>
           </form>
         </header>
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6 print:p-0">{children}</main>
       </div>
     </div>
   );

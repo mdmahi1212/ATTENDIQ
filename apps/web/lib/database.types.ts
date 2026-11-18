@@ -1438,6 +1438,19 @@ export type Database = {
         Returns: string
       }
       current_session_for_room: { Args: { p_room: string }; Returns: Json }
+      decide_appeal: {
+        Args: { p_appeal: string; p_approve: boolean; p_note: string }
+        Returns: undefined
+      }
+      file_appeal: {
+        Args: {
+          p_attachment?: string
+          p_reason: string
+          p_requested?: Database["public"]["Enums"]["att_status"]
+          p_session: string
+        }
+        Returns: string
+      }
       finalize_session: {
         Args: { p_now?: string; p_session: string }
         Returns: Json
@@ -1474,6 +1487,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      notify_at_risk: { Args: { p_section: string }; Returns: number }
       notify_session_staff: {
         Args: {
           p_body: string

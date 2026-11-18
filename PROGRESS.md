@@ -12,9 +12,29 @@ Last updated: 2026-11-18
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
 | 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
 | 5 Edge + MQTT + ingest + simulator | LIVE TEST PASSED — only the recorded-video check is open | see Gate 5 below |
-| 6 Occupancy + live dashboard + self-verify | DONE — waiting for "continue" | see Gate 6 below |
-| 7 Recheck, finalize, appeals, reports | not started | |
+| 6 Occupancy + live dashboard + self-verify | DONE (commit c53a737) | see Gate 6 below |
+| 7 Recheck, finalize, appeals, reports | DONE — waiting for "continue" | see Gate 7 below |
 | 8 ESP32, hardening, docs | not started | |
+
+## Gate 7 results (2026-11-19) — PASSED
+
+| Check | Result |
+|---|---|
+| **Full simulator `demo.yaml` ends with exactly the expected statuses (asserted in a test)** | ✅ `apps/simulator/tests/test_gate7_live.py` (`SIM_LIVE=1`): `simulator run --direct --finalize` replays the class (30 students: 20 on time, 5 late, 1 leaves at T0+50, 1 goes out and comes back, 3 no-shows, 1 unknown visitor, 3 duplicate events), the class ends 1 min later, pg_cron finalizes it, and every student is compared with the script: **state `ended`, 22 present, 5 late, 3 absent, gate_out/reentry flags exact, 1 unknown entry, 0 differences** (run twice) |
+| SQL tests | ✅ rule engine 95 + manual_mark 9 + **appeals 19** (no appeal while live, reason required, own folder only, one open appeal, students cannot decide, RLS visibility, decision note required, decided once, approve -> excused/appeal audited with professor + reason, notifications both ways, locked session refuses manual edits but appeals still decide, at-risk warning once per 6 days, students cannot warn) |
+| web vitest | ✅ 112 (new: next class in Asia/Seoul incl. ongoing + next week, 12-week heatmap worst-status-per-day, appeal eligibility) |
+| Playwright e2e | ✅ 10/10 (new: student files an appeal -> professor approves on /professor/appeals -> `present` via `appeal` + audit row with the professor as actor; professor report + at-risk block + CSV + session CSV; student settings) |
+| pytest simulator / pycommon | ✅ 11 (+1 live) / 5 |
+| lint / typecheck / build | ✅ |
+
+### Phase 7 decisions / notes
+- Migration 14 (`20261118125607_appeals_at_risk`): `file_appeal` (student; finished class, within `appeal_days`, present/late/excused, reason >= 10 chars, attachment must be in the student's own folder, one open appeal per class; notifies staff), `decide_appeal` (staff/admin; note required; approval sets the status even after lock, method `appeal`, evidence + audit reason `appeal approved: <note>`; notifies the student), `notify_at_risk` (staff; students below the highest `warn_attendance_pct`, once per 6 days, simulated students excluded). Private bucket `appeal-files` (JPEG/PNG/PDF, 5 MB): students upload only into `<their id>/`, staff read attachments of their sections' appeals via 5-minute signed URLs.
+- Lock: `session_tick` locks 48 h after the end; `manual_mark` refuses locked sessions (professor edits only before lock); after that, only appeals change a record.
+- Recheck: the DB opens it automatically at T_end-10 when C < V - tolerance and tells the professor ("Recheck started"); the professor can also start one any time from the live page. The spec's "Run recheck now / Skip" prompt is replaced by this automatic open + manual button (simpler, same outcome).
+- The scripted leaver (#26) stays `present` with a `went out` marker: in the demo the visitor keeps C >= V - tolerance, so no recheck fires; the professor sees the OUT marker next to the name and can mark `left_early` manually (audited).
+- Student portal: home (next/ongoing class card from the timetable, open "verify now" banner), `/student/attendance` (per course % from `attendance_summary`, 12-week heatmap, history with method + first seen + markers + professor notes, appeal links and appeal states), `/student/appeal` (status requested, reason, optional evidence upload straight to the private bucket), `/student/settings` (push toggle, devices with remove, re-enrollment request -> admins notified, withdraw consent).
+- Professor: `/professor/appeals` (open queue with evidence links, approve/reject with a note, decided list), `/professor/reports` (per section, at-risk list + "Warn at-risk students", CSV via `/api/reports/export`, Print / PDF via the browser with a print stylesheet), session CSV + print on the session page after the class.
+- Simulator: `--finalize` + `GET /api/edge/v1/sessions/{id}/results` (simulator key, simulation sessions only) so the Gate 7 check reads the final state without DB credentials.
 
 ## Gate 6 results (2026-11-18) — PASSED after the anti-spoofing fix
 
@@ -233,7 +253,7 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 - SQL tests: `scripts\test-db.ps1` (add `-Replay` for the from-zero replay). Needs `SUPABASE_DB_URL` in the repo-root `.env`.
 - New device key: `scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply]`.
 - Whole classroom stack: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1` (Mosquitto, face-api + tunnel, ingest, edge; logs in `logs\`).
-- Simulator: `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run` (MQTT) or `... run --direct` (HTTP).
+- Simulator: `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run` (MQTT) or `... run --direct` (HTTP); Gate 7 check: `... run --direct --finalize` or `$env:SIM_LIVE='1'; .\.venv\Scripts\python.exe -m pytest tests\test_gate7_live.py`.
 - Face API + tunnel: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1` (keep the window open while students enroll).
 - Face threshold eval: `appsace-api\.venv\Scripts\python.exe scriptsace-eval.py eval --out docsace-eval.md`.
 - Regenerate types: `npx supabase gen types typescript --linked > apps/web/lib/database.types.ts` (after `npx supabase login` + `link`).

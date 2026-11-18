@@ -175,3 +175,32 @@ def final_inside(script: Script) -> int:
             if g.reenter is not None:
                 n += 1
     return n
+
+
+def expected_final(script: Script) -> dict[uuid.UUID, dict[str, Any]]:
+    """After finalize with healthy devices: students still pending become absent (fail-safe rule)."""
+    out = {}
+    for sid, e in script.expected().items():
+        out[sid] = {**e, "status": "absent" if e["status"] == "pending" else e["status"]}
+    return out
+
+
+def compare(expected: dict[uuid.UUID, dict[str, Any]], actual: list[dict[str, Any]]) -> list[str]:
+    """Human-readable differences (empty = exact match). Only the flags the script talks about are compared."""
+    tracked = {"gate_out", "reentry"}
+    got = {uuid.UUID(a["student_id"]): a for a in actual}
+    problems = []
+    for sid, e in sorted(expected.items()):
+        a = got.get(sid)
+        if a is None:
+            problems.append(f"{sid}: missing from the roster")
+            continue
+        if a["status"] != e["status"]:
+            problems.append(f"{sid}: status {a['status']} != expected {e['status']}")
+        flags = sorted(set(a.get("flags") or []) & tracked)
+        if flags != sorted(e["flags"]):
+            problems.append(f"{sid}: flags {flags} != expected {sorted(e['flags'])}")
+    extra = set(got) - set(expected)
+    if extra:
+        problems.append(f"{len(extra)} unexpected students on the roster")
+    return problems

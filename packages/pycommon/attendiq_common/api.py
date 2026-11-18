@@ -74,5 +74,8 @@ class EdgeApi:
     def demo_session(self, started_minutes_ago: int, minutes: int) -> dict[str, Any]:
         return self._call("POST", "/sessions/demo", json={"started_minutes_ago": started_minutes_ago, "minutes": minutes}).json()
 
+    def session_results(self, session_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/sessions/{session_id}/results").json()
+
     def publish_face_api_url(self, url: str) -> None:
         self._call("POST", "/face-api-url", json={"url": url})

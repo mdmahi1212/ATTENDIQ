@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/app-shell";
 import { Pill, SimBadge, StatusBadge } from "@/components/badges";
 import { RowAction } from "@/components/form";
+import { PrintButton } from "@/components/print-button";
 import { StateBadge } from "@/components/state-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireRole } from "@/lib/auth";
@@ -137,6 +138,14 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
             Show room QR
           </Link>
           <RowAction action={endSession} fields={{ session_id: id }} label="End session" variant="destructive" confirm="End and finalize this session now? Pending students become absent if the devices were healthy." />
+        </div>
+      )}
+      {!live && (
+        <div className="mb-6 flex flex-wrap gap-2 print:hidden">
+          <a href={`/api/sessions/${id}/export`} className="inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium hover:bg-muted">
+            Download CSV
+          </a>
+          <PrintButton />
         </div>
       )}
 

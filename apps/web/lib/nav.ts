@@ -27,11 +27,18 @@ export function navFor(role: Role): NavItem[] {
     case "operator":
       return [{ href: "/operator", label: "Devices & health" }, inbox];
     case "professor":
-      return [{ href: "/professor", label: "My sections" }, inbox];
+      return [
+        { href: "/professor", label: "My sections" },
+        { href: "/professor/appeals", label: "Appeals" },
+        { href: "/professor/reports", label: "Reports" },
+        inbox,
+      ];
     case "student":
       return [
         { href: "/student", label: "My classes" },
+        { href: "/student/attendance", label: "My attendance" },
         { href: "/student/enroll", label: "Face enrollment" },
+        { href: "/student/settings", label: "Settings" },
         inbox,
       ];
   }

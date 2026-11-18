@@ -287,6 +287,7 @@ export type Database = {
           gate_offline_seconds: number
           id: string
           is_makeup: boolean
+          is_simulation: boolean
           last_mismatch_check_at: string | null
           locked_at: string | null
           low_count_alerted_at: string | null
@@ -310,6 +311,7 @@ export type Database = {
           gate_offline_seconds?: number
           id?: string
           is_makeup?: boolean
+          is_simulation?: boolean
           last_mismatch_check_at?: string | null
           locked_at?: string | null
           low_count_alerted_at?: string | null
@@ -333,6 +335,7 @@ export type Database = {
           gate_offline_seconds?: number
           id?: string
           is_makeup?: boolean
+          is_simulation?: boolean
           last_mismatch_check_at?: string | null
           locked_at?: string | null
           low_count_alerted_at?: string | null
@@ -1421,6 +1424,17 @@ export type Database = {
         Args: { p_now?: string; p_request: string }
         Returns: number
       }
+      create_adhoc_session: {
+        Args: {
+          p_minutes: number
+          p_room: string
+          p_section: string
+          p_simulation: boolean
+          p_starts_at: string
+        }
+        Returns: string
+      }
+      current_session_for_room: { Args: { p_room: string }; Returns: Json }
       finalize_session: {
         Args: { p_now?: string; p_session: string }
         Returns: Json

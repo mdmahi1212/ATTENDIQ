@@ -11,26 +11,38 @@ Last updated: 2026-11-18
 | 2 Web foundation | DONE (commit 5a4f6f0) | see Gate 2 below |
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
 | 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
-| 5 Edge + MQTT + ingest + simulator | STARTED (design only, no code yet) — see "Phase 5 plan" | |
+| 5 Edge + MQTT + ingest + simulator | BUILT — gate needs the user's recording + live walk-past | see Gate 5 below |
 | 6 Occupancy + live dashboard + self-verify | not started | |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
 
-## Phase 5 plan (written 2026-11-18, before any Phase 5 code)
+## Gate 5 status (2026-11-18)
 
-Findings from reading the spec + existing DB:
-- `apply_edge_events(p_device, p_events)` (migration 04) already validates envelopes, dedupes by `event_id`, writes `edge_events`/`gate_events`/`occupancy_samples`, calls `record_evidence` (status by `status_for_time`: present <= T0+10, late <= T0+30) and handles re-entry/OUT flags, camera offline, heartbeats. `source_device_id` is the device **uuid**. `session_gallery(p_session)` exists.
-- Seeded devices: e...0001 edge-B204, e...0002 ingest-B204 (posts batches = `p_device`), e...0003 simulator-B204. No keys set yet.
-- Today the IOT401 slot (Wed 10:30-11:45 KST) is past, so tests need an ad-hoc session.
-- Mosquitto is installed (`C:\Program Files\mosquitto`) but not on PATH. Python 3.11 via `py -3.11`.
+| Check | Result |
+|---|---|
+| pytest edge / ingest / simulator / pycommon | ✅ 24 / 7 / 7 / 5 (edge: line crossing, IoU tracker, voting rule incl. ambiguous + tied votes, dedupe + re-entry, outbox offline replay + idempotency + restart, camera offline/online + backoff, gate pipeline walk-in/out/stranger/small faces/presence mode, **2 tests on the real buffalo_l model**: enrolled face walking in -> RECOGNISED (score > 0.6), stranger -> UNKNOWN) · ruff clean |
+| web lint / typecheck / vitest / build | ✅ / ✅ / 89 / ✅ |
+| **Simulator: 30 simulated students get the correct statuses in the DB** | ✅ twice: over HTTP (`--direct`) and over the real IoT path simulator -> Mosquitto -> ingest -> API -> DB: 30/30 statuses (22 present, 5 late, 3 pending) and 30/30 flags (gate_out, reentry); 112 events stored, 3 duplicate event_ids ignored, unknown visitor logged, 0 real students touched |
+| Edge process end to end (video file -> InsightFace -> MQTT + outbox -> ingest -> DB) | ✅ MQTT control `start` -> gallery fetched (RAM only) -> IN + UNKNOWN + camera online/offline + heartbeat stored via ingest-B204; outbox drained (0 unsent). Synthetic video (sample photo face), not a real recording |
+| Device auth boundaries | ✅ no/bad key 401; simulator key on gallery 401; edge key on demo-session 401; other room 403; > 500 events 400 |
+| Broker ACL | ✅ wrong password refused; simulator publishing `control` dropped; ingest `control` delivered to edge |
+| Recorded video in `apps/edge/samples/` -> recognised entry | ⏳ NOT VERIFIED — needs the user's recording (instructions: `apps/edge/samples/README.md`) |
+| **LIVE: user walks past phone #1 -> `present`** | ⏳ NOT VERIFIED — needs phone #1 + the deployed routes |
+| Latency observed_at -> DB | ⏳ to be measured in the live test. Pipeline delay locally ~1 s; see clock finding below |
 
-Planned steps:
-1. Migration 10: `class_sessions.is_simulation`; `current_session_for_room(code)`; `create_adhoc_session(room, section, starts_at, minutes, simulation)` (service role; supersedes an older live simulation session; calls `start_session` so pending rows exist).
-2. Web routes (device key, `lib/device-auth.ts` already exists): `GET /api/edge/v1/sessions/current`, `GET /api/edge/v1/sessions/{id}/gallery`, `POST /api/edge/v1/events` (zod, <= 500, -> RPC), `POST /api/edge/v1/heartbeat`, `POST /api/edge/v1/sessions/demo` (simulator kind only). Admin action "start test session now" for the LIVE gate test.
-3. Shared Python lib `packages/pycommon` (pydantic envelope, topics); `apps/ingest` (paho QoS1 persistent, batch <= 1 s/100, backoff, session poll -> control); `apps/simulator` (`python -m simulator run --room B204 --script demo.yaml`, 30 SIM students, replays offsets relative to T0 with past `observed_at`).
-4. `apps/edge`: camera.py, gate.py (track, line-cross, vote), gallery.py, queue.py (SQLite outbox), heartbeat.py, config.example.yaml.
-5. `infra/mosquitto/mosquitto.conf` + ACL, `new-device-key.ps1` creates MQTT user, `scripts/start-classroom.ps1`.
-6. pytest for all three apps; simulator run against the DB; user records a sample video and does the LIVE walk-past test.
+### Phase 5 decisions / notes
+- **Laptop clock is ~2.5 min slow** (measured vs Vercel/Supabase: 153-156 s). That would turn late arrivals into "present". The edge now measures its offset from the server's HTTP `Date` header on every API call (median of 9) and stamps events with corrected time; heartbeats report `clock_offset_s` and the log warns above 5 s. The user should still sync Windows time.
+- Migration 10 (`20261118111446_edge_api_sessions`): `class_sessions.is_simulation`; `current_session_for_room(room)`; `create_adhoc_session(room, section, starts_at, minutes, simulation)` (service role). Simulation runs supersede the previous one silently and **only simulated students get attendance rows** (real students are never notified about a simulation). Verified in a rolled-back transaction + the runs above.
+- Admin -> Sections -> **"Start 30-min test session"** starts a real ad-hoc session now (for the live test outside the timetable); `session_tick` finalizes it at the end.
+- Web routes (device key, `Authorization: Bearer`): `GET /api/edge/v1/sessions/current?room=`, `GET /api/edge/v1/sessions/{id}/gallery` (edge kind, own room, live sessions only), `POST /api/edge/v1/events` (<= 500, per-event validation stays in `apply_edge_events`), `POST /api/edge/v1/heartbeat`, `POST /api/edge/v1/sessions/demo` (simulator kind only).
+- Shared Python package `packages/pycommon` (`attendiq_common`: pydantic envelope, topics, API client with clock offset), installed editable into each app venv.
+- ingest: paho-mqtt 2.2 with **manual ack** + persistent session: a message is acked to the broker only after the API stored it (at-least-once; server dedupe by event_id makes it effectively exactly-once). Invalid envelopes and 4xx batches are dropped (logged), 5xx/network errors back off 1 -> 60 s. Session poll every 15 s -> retained `control` message.
+- edge: `outbox.py` instead of `queue.py` (would shadow the stdlib module). Gate decision = >= 2 crops vote for the same student with score >= 0.45 and margin >= 0.08; tied votes -> unknown. `entry_mode: presence` added for a phone that only sees people walking IN (simplest live demo); `line` is the spec default. Unknown-face snapshots are NOT stored yet (privacy; spec item deferred to Phase 6/8).
+- **Mosquitto**: the installer's Windows service already listens on 127.0.0.1:1883 with the stock config. The project broker (`infra/mosquitto/mosquitto.conf`, users + ACL, LAN listener) needs that port: stop the service once (admin) or run `start-classroom.ps1 -MqttPort 1884`. Tests above ran on 1884.
+- Device keys for edge/ingest/simulator were generated into each app's gitignored `.env` (only SHA-256 hashes in `edge_devices`); MQTT passwords are hashed in the gitignored `infra/mosquitto/passwd`.
+
+### Phase 5 versions
+paho-mqtt 2.2.0 · pydantic 2.14.3 · pydantic-settings · httpx 0.28.1 · PyYAML 6.0.3 · psutil 7.2.2 · insightface 2.1 / onnxruntime 1.32.0 / opencv-python-headless 5.1.0.95 (edge) · Mosquitto (installed service) · pinned in apps/{edge,ingest,simulator}/requirements.txt
 
 ## Gate 4 results (2026-11-18) — PASSED
 
@@ -187,6 +199,8 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 
 - SQL tests: `scripts\test-db.ps1` (add `-Replay` for the from-zero replay). Needs `SUPABASE_DB_URL` in the repo-root `.env`.
 - New device key: `scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply]`.
+- Whole classroom stack: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1` (Mosquitto, face-api + tunnel, ingest, edge; logs in `logs\`).
+- Simulator: `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run` (MQTT) or `... run --direct` (HTTP).
 - Face API + tunnel: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1` (keep the window open while students enroll).
 - Face threshold eval: `appsace-api\.venv\Scripts\python.exe scriptsace-eval.py eval --out docsace-eval.md`.
 - Regenerate types: `npx supabase gen types typescript --linked > apps/web/lib/database.types.ts` (after `npx supabase login` + `link`).
@@ -209,3 +223,5 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 7. Push new commits yourself (`git push`): this session is not allowed to push. Vercel redeploys production on every push to `main`.
 8. After rotating the Supabase secret key: update `apps/web/.env.local`, run `node scripts/push-vercel-env.mjs` from `apps/web`, then redeploy.
 9. Gate 4 left a test student `student1@attendence.test` (password: `DUP_TEST_STUDENT_PASSWORD` in `apps/web/.env.local`) in face status `review`. Its 10 embeddings and thumbnail are **your face**: try Approve/Reject in /admin/faces, then have it deleted.
+10. **Sync the Windows clock** (it is ~2.5 min slow): Settings -> Time & language -> Date & time -> turn on "Set time automatically" -> "Sync now". The edge corrects for it anyway, but other tools trust the clock.
+11. **Free MQTT port 1883** for the project broker, once, in an ADMIN PowerShell: `Stop-Service mosquitto; Set-Service mosquitto -StartupType Manual` (or always start with `scripts\start-classroom.ps1 -MqttPort 1884`).

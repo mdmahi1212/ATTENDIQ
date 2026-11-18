@@ -1,0 +1,23 @@
+# One MQTT user per device (= edge_devices.name). Each device is limited to its own room's topics.
+# Add a room by copying a block and changing B204.
+
+user edge-B204
+topic write campus/B204/gate/event
+topic write campus/B204/inside/occupancy
+topic write campus/B204/device/heartbeat
+topic write campus/B204/gate/feedback
+topic read campus/B204/control
+
+user ingest-B204
+topic read campus/B204/gate/event
+topic read campus/B204/inside/occupancy
+topic read campus/B204/device/heartbeat
+topic write campus/B204/control
+
+user simulator-B204
+topic write campus/B204/gate/event
+topic write campus/B204/inside/occupancy
+topic write campus/B204/device/heartbeat
+
+user esp32-B204
+topic read campus/B204/gate/feedback

@@ -1,0 +1,15 @@
+# Scripted class for the 30 seeded simulated students (5a000000-...-0000000000NN, NN = 01..30).
+# Times are minutes relative to T0 (class start). Default policy: present <= T0+10, late <= T0+30.
+# `expect` is what the database must show after the run (checked by tests and by the gate query).
+name: demo
+minutes: 75
+occupancy_every_min: 1
+students:
+  - {ids: "01-20", arrive: [-6, 8], expect: present}       # on time, spread over the window
+  - {ids: "21-25", arrive: [12, 26], expect: late}         # late
+  - {ids: "26", arrive: 2, leave: 50, expect: present, flags: [gate_out]}         # leaves early (Phase 7 decides left_early)
+  - {ids: "27", arrive: 1, leave: 20, reenter: 24, expect: present, flags: [gate_out, reentry]}
+  - {ids: "28-30", expect: pending}                        # never come (absent after finalize)
+visitors:
+  - {at: 5}                                                # unknown face at the door
+duplicates: 3                                              # re-send 3 events with the same event_id

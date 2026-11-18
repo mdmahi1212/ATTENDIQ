@@ -1,0 +1,24 @@
+# apps/edge tuning (copy to config.yaml). Secrets and camera URLs live in .env.
+room_code: B204
+
+gate:
+  process_every_nth: 2        # run face detection on every Nth new frame (CPU budget)
+  det_size: 640               # SCRFD input size
+  min_face_px: 60             # smaller faces are tracked but not used for recognition
+  min_det_score: 0.6
+  # Entry line in normalised frame coords (0..1), drawn across the doorway as the CAMERA sees it.
+  line_a: [0.0, 0.55]
+  line_b: [1.0, 0.55]
+  in_side: 1                  # +1: a face moving from ABOVE the line to BELOW it is IN; -1: the opposite
+  min_travel_px: 25
+  # line = count IN only when a face crosses the line toward the room (spec).
+  # presence = phone looks only at people walking IN (simplest live demo): a recognised face seen for
+  #            presence_min_s counts as IN.
+  entry_mode: line
+  presence_min_s: 0.6
+  accept: 0.45                # cosine threshold (tune with scripts/face-eval.py)
+  margin: 0.08
+  min_votes: 2
+
+heartbeat_seconds: 15
+control_poll_seconds: 15      # fallback HTTP poll of the current session if no MQTT control arrives

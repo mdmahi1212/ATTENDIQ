@@ -3,10 +3,12 @@
 #   scripts\new-device-key.ps1 -DeviceId e0000000-0000-4000-8000-000000000001          # print key + SQL
 #   scripts\new-device-key.ps1 -DeviceId e0000000-0000-4000-8000-000000000001 -Apply   # also write the hash (needs SUPABASE_DB_URL)
 # Seeded devices: ...0001 edge-B204, ...0002 ingest-B204, ...0003 simulator-B204.
-# (Phase 5 extends this script to create the matching Mosquitto user.)
+#   ... -MqttUser edge-B204   # also create/replace that Mosquitto user (password printed once; add the user to
+#                               infra/mosquitto/acl if it is new, then restart Mosquitto).
 param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$DeviceId,
-    [switch]$Apply
+    [switch]$Apply,
+    [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$MqttUser = ''
 )
 $ErrorActionPreference = 'Stop'
 
@@ -42,4 +44,24 @@ if ($Apply) {
 } else {
     Write-Host 'Run this in the Supabase SQL editor to activate the key (or re-run with -Apply):'
     Write-Host $sql
+}
+
+if ($MqttUser) {
+    $root = Split-Path -Parent $PSScriptRoot
+    $passwd = Join-Path $root 'infra\mosquitto\passwd'
+    $tool = "$env:ProgramFiles\mosquitto\mosquitto_passwd.exe"
+    if (-not (Test-Path $tool)) { throw "mosquitto_passwd not found at $tool" }
+    $pbytes = New-Object byte[] 18
+    $prng = [System.Security.Cryptography.RandomNumberGenerator]::Create(); $prng.GetBytes($pbytes); $prng.Dispose()
+    $mqttPw = [Convert]::ToBase64String($pbytes).Replace('+', '-').Replace('/', '_')
+    if (-not (Test-Path $passwd)) { New-Item -ItemType File $passwd | Out-Null }
+    & $tool -b $passwd $MqttUser $mqttPw
+    if ($LASTEXITCODE -ne 0) { throw 'mosquitto_passwd failed' }
+    Write-Host ''
+    Write-Host "MQTT user : $MqttUser"
+    Write-Host "MQTT pass : $mqttPw" -ForegroundColor Yellow
+    Write-Host '            ^ copy it into the device .env (MQTT_USERNAME / MQTT_PASSWORD). Only its hash is stored in infra/mosquitto/passwd.'
+    if (-not (Select-String -Path (Join-Path $root 'infra\mosquittocl') -Pattern "^user $MqttUser$" -Quiet)) {
+        Write-Warning "Add a 'user $MqttUser' block to infra/mosquitto/acl, then restart Mosquitto."
+    }
 }

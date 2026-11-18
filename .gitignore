@@ -50,6 +50,7 @@ models/
 eval/
 apps/edge/samples/*
 !apps/edge/samples/.gitkeep
+!apps/edge/samples/README.md
 
 # --- Supabase CLI local state ---
 supabase/.temp/

@@ -12,11 +12,11 @@ Last updated: 2026-11-18
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
 | 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
 | 5 Edge + MQTT + ingest + simulator | LIVE TEST PASSED — only the recorded-video check is open | see Gate 5 below |
-| 6 Occupancy + live dashboard + self-verify | BUILT — gate needs the user's live test (phone) | see Gate 6 below |
+| 6 Occupancy + live dashboard + self-verify | DONE — waiting for "continue" | see Gate 6 below |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
 
-## Gate 6 status (2026-11-18)
+## Gate 6 results (2026-11-18) — PASSED after the anti-spoofing fix
 
 | Check | Result |
 |---|---|
@@ -27,7 +27,8 @@ Last updated: 2026-11-18
 | edge / ingest / simulator / pycommon pytest | ✅ 31 / 7 / 9 / 5 (new: seat-ROI by bottom-centre, median smoothing, stability timer, **real YOLOv8n on a 6-person photo**) · ruff clean |
 | lint / typecheck / build | ✅ |
 | **LIVE: hide face at gate -> push -> verify with QR + face -> `present` (self_verify)** | ✅ session 171eaa06 (T0 set 9 min back, staff_count 0): the laptop webcam (inside camera, YOLOv8n) counted 1 stable person, the 12:26:00 tick found C 1 > V 0 and opened a `mismatch` request -> `verify_now` push to the user's phone -> room QR scanned from the professor's projector page -> **`present`, method `self_verify`, 12:29:05** (first mismatch window); face 0.90, QR ok, GPS ±20 m but outside the placeholder B204 polygon (QR carried it) |
-| **LIVE: a printed photo fails liveness** | ❌ **FAILED on the first build**: the printed photo PASSED (session 66156444, attempt 12:32:02, face 0.885, browser liveness true) — the browser challenges can be faked (e.g. covering the photo's eyes = blink) and the server trusted the browser flag. **Fix built**: server-side passive anti-spoofing (InsightFace `liveness.onnx` addon, SHA-256-verified) on every uploaded frame; self-verify now needs browser challenges AND a server `live` verdict (`spoof_suspected` / `liveness_unclear`), enrollment drops non-live photos, `verification_attempts.live_score` stored (migration 13). Real faces score 0.998 through the phone camera. ⏳ Re-test with the printed photo NOT DONE yet. The spoofed `present` row in session 66156444 is left as evidence |
+| **LIVE: a printed photo fails liveness** | ✅ after a fix. **First build FAILED**: the printed photo passed (session 66156444, 12:32:02, face 0.885) because the browser challenges can be faked (covering the photo's eyes = blink) and the server trusted the browser flag; that spoofed `present` row is left as evidence. **Fix** (commit 9c370ae): server-side passive anti-spoofing (InsightFace `liveness.onnx`) on every uploaded frame; verify needs browser challenges AND a server `live` verdict. **Re-test**: (1) twice the print was stopped by the browser challenges before any upload (no attempt rows, no server logs); (2) the server model on 59 webcam frames of the printed photo: live_score 0.000-0.27 (median ~0.01), **0/59 accepted**; (3) the user's real face through the phone in self-verify: **live_score 0.9991 -> pass** (session 3e53674f, 12:51:52, face 0.888, QR ok, `late` because it was a professor-sent window at T0+14) |
+| Real face on the LAPTOP webcam | ⚠️ median live_score ~0.7, only ~half the frames >= 0.8 (dim, soft image). Self-verify uses the phone camera (0.998-0.999), so this matters only if verification were ever done on a laptop. Threshold stays 0.8 (`LIVENESS_THRESHOLD`) |
 
 ### Phase 6 decisions / notes
 - **Anti-spoofing after the failed photo test:** face-api 1.1.0 loads InsightFace's official passive liveness addon (`models/addons/liveness.onnx`, 1.5 MB, downloaded once from deepinsight's GitHub release with the SHA-256 InsightFace pins) in `observe` mode and returns `live` + `live_score` per image (threshold 0.8, `LIVENESS_THRESHOLD`). `/health` reports `liveness`. Next.js requires it unless `FACE_REQUIRE_LIVENESS=false` (dev only).

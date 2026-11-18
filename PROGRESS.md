@@ -10,11 +10,27 @@ Last updated: 2026-11-18
 | 1 Database | DONE (commit 1a130c2) | see Gate 1 below |
 | 2 Web foundation | DONE (commit 5a4f6f0) | see Gate 2 below |
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
-| 4 Face API + enrollment | DONE — waiting for "continue" | see Gate 4 below |
-| 5 Edge + MQTT + ingest + simulator | not started | |
+| 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
+| 5 Edge + MQTT + ingest + simulator | STARTED (design only, no code yet) — see "Phase 5 plan" | |
 | 6 Occupancy + live dashboard + self-verify | not started | |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
+
+## Phase 5 plan (written 2026-11-18, before any Phase 5 code)
+
+Findings from reading the spec + existing DB:
+- `apply_edge_events(p_device, p_events)` (migration 04) already validates envelopes, dedupes by `event_id`, writes `edge_events`/`gate_events`/`occupancy_samples`, calls `record_evidence` (status by `status_for_time`: present <= T0+10, late <= T0+30) and handles re-entry/OUT flags, camera offline, heartbeats. `source_device_id` is the device **uuid**. `session_gallery(p_session)` exists.
+- Seeded devices: e...0001 edge-B204, e...0002 ingest-B204 (posts batches = `p_device`), e...0003 simulator-B204. No keys set yet.
+- Today the IOT401 slot (Wed 10:30-11:45 KST) is past, so tests need an ad-hoc session.
+- Mosquitto is installed (`C:\Program Files\mosquitto`) but not on PATH. Python 3.11 via `py -3.11`.
+
+Planned steps:
+1. Migration 10: `class_sessions.is_simulation`; `current_session_for_room(code)`; `create_adhoc_session(room, section, starts_at, minutes, simulation)` (service role; supersedes an older live simulation session; calls `start_session` so pending rows exist).
+2. Web routes (device key, `lib/device-auth.ts` already exists): `GET /api/edge/v1/sessions/current`, `GET /api/edge/v1/sessions/{id}/gallery`, `POST /api/edge/v1/events` (zod, <= 500, -> RPC), `POST /api/edge/v1/heartbeat`, `POST /api/edge/v1/sessions/demo` (simulator kind only). Admin action "start test session now" for the LIVE gate test.
+3. Shared Python lib `packages/pycommon` (pydantic envelope, topics); `apps/ingest` (paho QoS1 persistent, batch <= 1 s/100, backoff, session poll -> control); `apps/simulator` (`python -m simulator run --room B204 --script demo.yaml`, 30 SIM students, replays offsets relative to T0 with past `observed_at`).
+4. `apps/edge`: camera.py, gate.py (track, line-cross, vote), gallery.py, queue.py (SQLite outbox), heartbeat.py, config.example.yaml.
+5. `infra/mosquitto/mosquitto.conf` + ACL, `new-device-key.ps1` creates MQTT user, `scripts/start-classroom.ps1`.
+6. pytest for all three apps; simulator run against the DB; user records a sample video and does the LIVE walk-past test.
 
 ## Gate 4 results (2026-11-18) — PASSED
 

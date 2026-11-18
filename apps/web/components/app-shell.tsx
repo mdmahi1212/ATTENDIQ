@@ -4,6 +4,7 @@ import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/lib/auth";
 import { NavLinks, type NavItem } from "@/components/nav-links";
+import { NotificationBell } from "@/components/notification-bell";
 
 export function AppShell({
   title,
@@ -29,6 +30,7 @@ export function AppShell({
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-end gap-3 border-b px-4 py-2 text-sm">
+          <NotificationBell userId={user.id} />
           <span className="truncate text-muted-foreground" data-testid="current-user">
             {user.fullName} · {user.role}
           </span>

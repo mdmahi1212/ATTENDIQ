@@ -29,6 +29,7 @@ const vars = [
   ["SUPABASE_SERVICE_ROLE_KEY", env.SUPABASE_SERVICE_ROLE_KEY, true],
   ["VAPID_PRIVATE_KEY", env.VAPID_PRIVATE_KEY, true],
   ["PUSH_WEBHOOK_SECRET", env.PUSH_WEBHOOK_SECRET, true],
+  ["FACE_API_SECRET", env.FACE_API_SECRET, true], // FACE_API_URL is NOT pushed: production reads the tunnel URL from the DB
 ];
 
 const missing = vars.filter(([, v]) => !v).map(([k]) => k);
@@ -56,5 +57,5 @@ for (const [key, value, sensitive] of vars) {
     console.log(`FAIL  ${key}: ${msg}`);
   }
 }
-console.log(failed ? `\n${failed} variable(s) failed.` : "\nAll 8 variables are set for Production and Preview. Now redeploy.");
+console.log(failed ? `\n${failed} variable(s) failed.` : "\nAll ${vars.length} variables are set for Production and Preview. Now redeploy.");
 process.exit(failed ? 1 : 0);

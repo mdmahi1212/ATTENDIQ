@@ -19,6 +19,12 @@ export default async function FacesPage() {
   const rows = data ?? [];
   const counts = Object.fromEntries(STATUSES.map((s) => [s, rows.filter((r) => r.status === s).length]));
   const review = rows.filter((r) => r.status === "review");
+  // Review thumbnails (private bucket, admin-only storage policy): short-lived signed URLs.
+  const thumbs = new Map<string, string>();
+  if (review.length) {
+    const { data: signed } = await supabase.storage.from("face-review").createSignedUrls(review.map((r) => `${r.student_id}.jpg`), 300);
+    for (const s of signed ?? []) if (s.signedUrl && s.path) thumbs.set(s.path.replace(/\.jpg$/, ""), s.signedUrl);
+  }
 
   return (
     <>
@@ -44,8 +50,16 @@ export default async function FacesPage() {
         <ul className="mb-6 divide-y rounded-lg border">
           {review.map((r) => (
             <li key={r.student_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-              <span>
+              <span className="inline-flex items-center gap-3">
+                {thumbs.has(r.student_id) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not worth next/image config
+                  <img src={thumbs.get(r.student_id)} alt="" className="size-14 rounded object-cover" />
+                ) : (
+                  <span className="grid size-14 place-items-center rounded bg-muted text-xs text-muted-foreground">no photo</span>
+                )}
+                <span>
                 <strong>{r.profiles?.full_name}</strong> {r.profiles?.email} — {r.review_note ?? "flagged by duplicate check"}
+                </span>
               </span>
               <span className="inline-flex gap-1">
                 <RowAction action={approveFace} fields={{ student_id: r.student_id }} label="Approve" />

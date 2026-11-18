@@ -12,6 +12,7 @@ export const approveFace = formAction({
   revalidate: "/admin/faces",
   run: async ({ student_id, note }, { supabase }) => {
     check(await supabase.from("face_profiles").update({ status: "active", review_note: note ?? null, updated_at: new Date().toISOString() }).eq("student_id", student_id).eq("status", "review"));
+    await createAdminClient().storage.from("face-review").remove([`${student_id}.jpg`]);
     return "Approved: the student can now be recognised at the gate.";
   },
 });
@@ -30,6 +31,7 @@ export const rejectFace = formAction({
       p_body: "Your face enrollment could not be approved. Please redo it.",
       p_data: { url: "/student/enroll" },
     });
+    await createAdminClient().storage.from("face-review").remove([`${student_id}.jpg`]);
     return "Rejected; embeddings deleted and the student was asked to re-enroll.";
   },
 });

@@ -9,12 +9,42 @@ Last updated: 2026-11-18
 | 0 Preflight | DONE (commit b0295a4) | tools ✅, skeleton ✅, .env.example per app ✅ |
 | 1 Database | DONE (commit 1a130c2) | see Gate 1 below |
 | 2 Web foundation | DONE (commit 5a4f6f0) | see Gate 2 below |
-| 3 PWA + push + deploy | DONE — waiting for "continue" | see Gate 3 below |
-| 4 Face API + enrollment | not started | |
+| 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
+| 4 Face API + enrollment | BUILT — gate needs the user's phone test | see Gate 4 below |
 | 5 Edge + MQTT + ingest + simulator | not started | |
 | 6 Occupancy + live dashboard + self-verify | not started | |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
+
+## Gate 4 status (2026-11-18)
+
+| Check | Result |
+|---|---|
+| face-api pytest + ruff | ✅ 18/18 (13 with a fake engine + 5 on the real buffalo_l model: single face OK with unit 512-d embedding, no face, two faces, blurred, same person > 0.6 vs others < 0.35) · ruff clean |
+| web vitest | ✅ 85/85 (31 new: liveness state machine on synthetic landmark streams incl. static photo → timeout, always-closed eyes, smile flicker, wrong turn direction, second face, face lost; pose classifier + capture plan; outlier removal; duplicate decision; request schema; tunnel URL validation) |
+| lint / typecheck / build | ✅ / ✅ / ✅ |
+| face-api runs locally | ✅ `/health` model_loaded; `/embed` 401 without secret, embeddings with it |
+| face-api through the tunnel | ✅ `scripts/start-face-api.ps1` → quick tunnel `https://<random>.trycloudflare.com/health` OK, `/embed` 401 without secret, 2 embeddings with it; URL stored in `private.app_config.face_api_url` |
+| `/api/face/enroll` end-to-end (local dev server + real face-api, Playwright, test accounts removed afterwards) | ✅ no session → 401; no consent → 403; consent via UI → 6 embeddings stored, `face_profiles.status = active`, template set, model `insightface-buffalo_l`; second attempt → 409; **same face on a second account → `review`** with note naming the first student (similarity 1.00); different face → `active` |
+| `scripts/face-eval.py` | ✅ runs; `docs/face-eval.md` holds only a pipeline smoke test (synthetic genuine pairs). **NOT VERIFIED on real photos** — needs `eval/<person>/` photos |
+| **User enrolls on the phone → active with ≥ 5 embeddings** | ⏳ NOT VERIFIED — needs the deployed build + the user's phone (camera, MediaPipe on mobile, liveness thresholds on a real face) |
+| **Duplicate check flags a second account with the user's face** | ⏳ NOT VERIFIED on the phone (passes in the local e2e above) |
+
+### Phase 4 decisions / notes
+- **InsightFace 2.1** installs from a wheel on Windows/Python 3.11: no MSVC Build Tools needed. **Smart App Control had to be turned off** (it blocks onnx/onnxruntime DLLs); the user did it.
+- **Model licence:** InsightFace code is MIT, the pretrained `buffalo_l` weights are **non-commercial research only** (noted in apps/face-api/README.md).
+- face-api stays stateless: Next.js does consent, outlier removal (embedding vs the person's own mean < 0.45 → dropped), duplicate check (`match_face_any` per embedding, any other student > 0.60 → `review`) and storage (`store_face_enrollment`, one transaction, L2-normalised mean template, audit actor = the student).
+- Students can enroll only from `pending`/`rejected`/`deleted`; an `active` or `review` profile needs an admin reset (stops someone re-enrolling another person's account).
+- Consent: versioned text in `lib/consent.ts` (`2026-11-v1`); withdrawing deletes embeddings + template + review thumbnail.
+- **Head yaw/pitch come from landmark geometry** (nose vs eye corners, normalised by eye distance) instead of the facial transformation matrix the build prompt mentions: scale-free, easy to unit-test with synthetic landmarks, no matrix sign conventions to guess. Blink/smile use the `eyeBlink*`/`mouthSmile*` blendshapes as specified.
+- Liveness = 3 random challenges from {blink, turn left, turn right, smile}; each needs a change (open→closed→open, neutral→smile held 250 ms, centre→turn→centre), 8 s per challenge, a second face for 300 ms or no face for 1 s fails. Capture right after liveness: 2 auto-shots each front/left/right/up/down (pitch relative to the person's neutral pitch), face must stay in view. Liveness is client-side (as specified); the server only checks that a passed result is present — a determined attacker with a modified client can skip it. Server-side liveness (InsightFace has an addon) is a possible Phase 8 hardening.
+- MediaPipe runtime is self-hosted: `scripts/copy-mediapipe.mjs` (predev/prebuild) copies the WASM from the pinned package and downloads `face_landmarker.task` (float16 v1, 3.8 MB) into `public/mediapipe/` (gitignored).
+- **Face-api URL:** `FACE_API_URL` env if set (local dev: `http://127.0.0.1:8000`), else `private.app_config.face_api_url`. `start-face-api.ps1` publishes the tunnel URL through `POST /api/edge/v1/face-api-url` with the laptop's **edge device key** (`Authorization: Bearer`), so the laptop never holds Supabase credentials. Until `apps/edge/.env` exists (Phase 5) the script prints the SQL instead.
+- Quick tunnel (no Cloudflare account) is used for now: URL changes on every start. A named tunnel needs a Cloudflare account + a domain (`-TunnelName face -PublicUrl https://face.<domain>`).
+- Review thumbnails: 160 px JPEG, only stored when an enrollment goes to `review`, private bucket `face-review`, shown to admins via 5-minute signed URLs, deleted on approve/reject/withdraw.
+
+### Phase 4 versions
+Python 3.11.9 · insightface 2.1 · onnxruntime 1.32.0 · numpy 2.4.6 · opencv-python-headless 5.1.0.95 · fastapi 0.163.2 · uvicorn 0.54.0 · python-multipart 0.0.34 · pydantic-settings 2.16.3 · pytest 9.2.0 · ruff 0.17.5 (all in apps/face-api/requirements.txt) · @mediapipe/tasks-vision 1.2.3 · cloudflared 2026.11.0
 
 ## Gate 3 results (2026-11-18)
 
@@ -139,6 +169,8 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 
 - SQL tests: `scripts\test-db.ps1` (add `-Replay` for the from-zero replay). Needs `SUPABASE_DB_URL` in the repo-root `.env`.
 - New device key: `scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply]`.
+- Face API + tunnel: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1` (keep the window open while students enroll).
+- Face threshold eval: `appsace-api\.venv\Scripts\python.exe scriptsace-eval.py eval --out docsace-eval.md`.
 - Regenerate types: `npx supabase gen types typescript --linked > apps/web/lib/database.types.ts` (after `npx supabase login` + `link`).
 
 ## Open issues / later phases
@@ -155,6 +187,6 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 3. ~~Service-role key in `apps/web/.env.local`~~ (done 2026-11-18). It was pasted into chat to get it onto disk, so **rotate it** in Supabase (Project Settings → API Keys) when convenient and put the new one in `.env.local` with `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\set-service-key.ps1` (hidden-input prompt). Note: PowerShell script execution is disabled on this PC; project scripts need `-ExecutionPolicy Bypass` per run or `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 4. To sign in as the seeded admin: after the key is set, open `/admin/people` as the e2e admin (or ask Claude) and use "Password link" on `admin@attendance.test`, or use the e2e admin account.
 5. Student self sign-up sends a confirmation email. Supabase's built-in mailer only delivers to project team members: either turn off "Confirm email" (Auth → Providers → Email) for the demo, or configure SMTP.
-6. ~~Vercel + GitHub (Phase 3)~~ (done). Cloudflare account for the face-api tunnel (Phase 4).
+6. ~~Vercel + GitHub (Phase 3)~~ (done). Optional: Cloudflare account + domain for a fixed face-api hostname (named tunnel); the quick tunnel works without one.
 7. Push new commits yourself (`git push`): this session is not allowed to push. Vercel redeploys production on every push to `main`.
 8. After rotating the Supabase secret key: update `apps/web/.env.local`, run `node scripts/push-vercel-env.mjs` from `apps/web`, then redeploy.

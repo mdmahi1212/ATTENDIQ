@@ -358,6 +358,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "class_sessions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms_geo"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "class_sessions_section_id_fkey"
             columns: ["section_id"]
             isOneToOne: false
@@ -460,6 +467,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "edge_devices_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms_geo"
             referencedColumns: ["id"]
           },
         ]
@@ -1066,6 +1080,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sections_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms_geo"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "sections_semester_id_fkey"
             columns: ["semester_id"]
             isOneToOne: false
@@ -1170,6 +1191,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_slots_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms_geo"
             referencedColumns: ["id"]
           },
           {
@@ -1341,6 +1369,14 @@ export type Database = {
           geofence: Json | null
           id: string | null
         }
+        Insert: {
+          geofence?: never
+          id?: string | null
+        }
+        Update: {
+          geofence?: never
+          id?: string | null
+        }
         Relationships: []
       }
     }
@@ -1389,6 +1425,7 @@ export type Database = {
         Args: { p_now?: string; p_session: string }
         Returns: Json
       }
+      get_app_config: { Args: { p_key: string }; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_enrolled_in_section: { Args: { p_section: string }; Returns: boolean }
       is_operator: { Args: never; Returns: boolean }
@@ -1466,7 +1503,14 @@ export type Database = {
       }
       session_gallery: { Args: { p_session: string }; Returns: Json }
       session_tick: { Args: { p_now?: string }; Returns: Json }
-      set_push_webhook_secret: { Args: { p_secret: string }; Returns: undefined }
+      set_app_config: {
+        Args: { p_key: string; p_value: string }
+        Returns: undefined
+      }
+      set_push_webhook_secret: {
+        Args: { p_secret: string }
+        Returns: undefined
+      }
       start_session: {
         Args: { p_now?: string; p_session: string }
         Returns: undefined
@@ -1478,6 +1522,17 @@ export type Database = {
       status_rank: {
         Args: { s: Database["public"]["Enums"]["att_status"] }
         Returns: number
+      }
+      store_face_enrollment: {
+        Args: {
+          p_embeddings: Json
+          p_model: string
+          p_note: string
+          p_replace: boolean
+          p_status: string
+          p_student: string
+        }
+        Returns: Json
       }
       teaches_student: { Args: { p_student: string }; Returns: boolean }
     }

@@ -1466,6 +1466,7 @@ export type Database = {
       }
       session_gallery: { Args: { p_session: string }; Returns: Json }
       session_tick: { Args: { p_now?: string }; Returns: Json }
+      set_push_webhook_secret: { Args: { p_secret: string }; Returns: undefined }
       start_session: {
         Args: { p_now?: string; p_session: string }
         Returns: undefined

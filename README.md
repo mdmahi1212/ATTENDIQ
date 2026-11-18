@@ -51,6 +51,15 @@ lives only in `apps/web` server code.
   Needs `SUPABASE_DB_URL` in the repo-root `.env`.
 - Device keys: `scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply]`.
 
+## Web app (Phases 2–3)
+
+- Live: https://attendiq-rho.vercel.app (Vercel project `attendiq`, deploys `main` of the private GitHub repo).
+- Local: `cd apps/web; npm run dev | npm run lint | npm run typecheck | npm test | npm run build | npm run e2e`
+  (on Windows PowerShell with script execution disabled, use `npm.cmd` / `npx.cmd`).
+- Env: `apps/web/.env.local` (gitignored). Push it to Vercel with `node scripts/push-vercel-env.mjs` (Vercel CLI login needed).
+- Push webhook secret: `node scripts/rotate-webhook-secret.mjs` sets it in the DB, Vercel and `.env.local` together; then redeploy.
+- Icons: `node scripts/make-icons.mjs` regenerates `public/icons/*.png`.
+
 ## Quick start
 
 Filled in as phases complete (see PROGRESS.md). Final fresh-laptop guide lands in Phase 8.

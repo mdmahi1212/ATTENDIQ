@@ -8,13 +8,38 @@ Last updated: 2026-11-18
 |---|---|---|
 | 0 Preflight | DONE (commit b0295a4) | tools ✅, skeleton ✅, .env.example per app ✅ |
 | 1 Database | DONE (commit 1a130c2) | see Gate 1 below |
-| 2 Web foundation | DONE — waiting for "continue" | see Gate 2 below |
-| 3 PWA + push + deploy | not started | |
+| 2 Web foundation | DONE (commit 5a4f6f0) | see Gate 2 below |
+| 3 PWA + push + deploy | DONE — waiting for "continue" | see Gate 3 below |
 | 4 Face API + enrollment | not started | |
 | 5 Edge + MQTT + ingest + simulator | not started | |
 | 6 Occupancy + live dashboard + self-verify | not started | |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
+
+## Gate 3 results (2026-11-18)
+
+| Check | Result |
+|---|---|
+| Deployed URL | ✅ https://attendiq-rho.vercel.app (Vercel project `attendiq`, team mdmahi1212's projects, from GitHub `mdmahi1212/ATTENDIQ` (private) `main`, root `apps/web`, Node 24.x, functions in `hnd1` Tokyo next to Supabase) |
+| Public reachability | ✅ /login, /manifest.webmanifest, /sw.js, icons → 200; /admin signed-out → 307 /login; push-dispatch without secret → 401 (Vercel Authentication does not cover the production domain) |
+| DB webhook → push-dispatch | ✅ pg_net call accepted (HTTP 200) after the secret was set via `scripts/rotate-webhook-secret.mjs` |
+| **Enrolling a student creates `enroll_face` and a real push arrives on the phone** | ✅ USER CONFIRMED: real student enrolled in IOT401-01 at 06:27:26 UTC → `enroll_face` notification → dispatch `{"sent":2,"removed":0,"failed":[]}` (Android Chrome + Windows Chrome via FCM) → push arrived on the Android phone and tapping it opened /student/enroll |
+| lint / typecheck / unit / build | ✅ 0 problems / ✅ / 54/54 / ✅ |
+| Playwright e2e | ✅ 7/7 (adds: Realtime inbox shows a new notification without reload + click marks read; subscribe and dispatch APIs refuse anonymous calls) |
+| Local dispatch test | ✅ wrong secret → 401; right secret with a dead FCM token → removed=1 (404/410 cleanup) |
+| NOT VERIFIED | iPhone push (no iPhone tested; the iOS Add-to-Home-Screen path is implemented and unit-tested, not tried on a device) |
+
+### Phase 3 decisions / notes
+- `web-push` **4.0.0** is ESM-only with named exports and an unbound `setVapidDetails`; VAPID details are passed per `sendNotification` call. Types: `@types/web-push` 3.6.4 (still matches the call signatures used).
+- VAPID subject = the app URL (`https://attendiq-rho.vercel.app`), not a personal email.
+- Push TTL = time left in the notification's window (0 → not sent); verify/recheck pushes are `urgency: high`, `requireInteraction`, one per window (`tag`).
+- Realtime inbox: the browser client must load the session and call `realtime.setAuth()` **before** joining, otherwise the socket joins as anon and RLS delivers nothing (found by the e2e test, fixed).
+- Migration 08 (`20261118062036_set_push_webhook_secret_rpc`): `set_push_webhook_secret(text)` (service role only) so the secret never has to be typed into the SQL editor.
+- Env vars were pushed with `apps/web/scripts/push-vercel-env.mjs` (Vercel CLI 66.1.0, values via stdin, secrets Sensitive) because the Vercel connector has no permission to create env vars. Rotate the webhook secret any time with `node scripts/rotate-webhook-secret.mjs` (then redeploy).
+- On this PC use `npx.cmd`, not `npx`, in PowerShell (script execution is disabled).
+
+### Phase 3 versions
+web-push 4.0.0 · @types/web-push 3.6.4 · Vercel CLI 66.1.0 (via npx, not installed) · Vercel build image Node 24.x
 
 ## Gate 2 status (2026-11-18)
 
@@ -130,4 +155,6 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 3. ~~Service-role key in `apps/web/.env.local`~~ (done 2026-11-18). It was pasted into chat to get it onto disk, so **rotate it** in Supabase (Project Settings → API Keys) when convenient and put the new one in `.env.local` with `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\set-service-key.ps1` (hidden-input prompt). Note: PowerShell script execution is disabled on this PC; project scripts need `-ExecutionPolicy Bypass` per run or `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 4. To sign in as the seeded admin: after the key is set, open `/admin/people` as the e2e admin (or ask Claude) and use "Password link" on `admin@attendance.test`, or use the e2e admin account.
 5. Student self sign-up sends a confirmation email. Supabase's built-in mailer only delivers to project team members: either turn off "Confirm email" (Auth → Providers → Email) for the demo, or configure SMTP.
-6. Vercel account linked to GitHub (Phase 3). Cloudflare account (Phase 4).
+6. ~~Vercel + GitHub (Phase 3)~~ (done). Cloudflare account for the face-api tunnel (Phase 4).
+7. Push new commits yourself (`git push`): this session is not allowed to push. Vercel redeploys production on every push to `main`.
+8. After rotating the Supabase secret key: update `apps/web/.env.local`, run `node scripts/push-vercel-env.mjs` from `apps/web`, then redeploy.

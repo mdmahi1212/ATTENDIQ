@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
+import { rateLimited } from "@/lib/rate-limit";
 import { ALL_CHALLENGES } from "@/lib/face/liveness";
 import { embedImages, FaceApiError, requireLiveness } from "@/lib/face-api";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
   const user = await getCurrentUser();
   if (!user) return fail(401, "Please sign in again.");
   if (user.role !== "student") return fail(403, "Only students verify.");
+  const limited = await rateLimited("verify", user.id);
+  if (limited) return limited;
   const { requestId } = await ctx.params;
   if (!z.guid().safeParse(requestId).success) return fail(400, "Bad link.");
 

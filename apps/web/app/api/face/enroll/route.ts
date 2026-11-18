@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { rateLimited } from "@/lib/rate-limit";
 import { CONSENT_VERSION } from "@/lib/consent";
 import { duplicateDecision, enrollMetaSchema, MAX_IMAGE_BYTES, MIN_GOOD_IMAGES, selectEmbeddings, type DuplicateHit } from "@/lib/face/enroll";
 import { embedImages, FACE_MODEL_VERSION, FaceApiError, requireLiveness } from "@/lib/face-api";
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return fail(401, "Please sign in again.");
   if (user.role !== "student") return fail(403, "Only students enroll a face.");
+  const limited = await rateLimited("enroll", user.id);
+  if (limited) return limited;
 
   const form = await request.formData().catch(() => null);
   if (!form) return fail(400, "Bad upload.");

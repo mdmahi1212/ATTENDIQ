@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 /** Current rotating room QR token for the projector (session staff / admin only). */
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/sessions/[id]/qr">) {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "professor" && user.role !== "admin")) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!user || !user.mfaOk || (user.role !== "professor" && user.role !== "admin")) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const { id } = await ctx.params;
   if (!z.guid().safeParse(id).success) return NextResponse.json({ error: "bad id" }, { status: 400 });
   if (!(await isSessionStaff(id))) return NextResponse.json({ error: "forbidden" }, { status: 403 });

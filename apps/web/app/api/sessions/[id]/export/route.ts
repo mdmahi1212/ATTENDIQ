@@ -12,7 +12,7 @@ const COLUMNS = ["student_no", "full_name", "status", "method", "first_seen", "f
 /** One class's roster as CSV (staff of the section or admin, via RLS). */
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/sessions/[id]/export">) {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "admin" && user.role !== "professor")) return new NextResponse("Forbidden", { status: 403 });
+  if (!user || !user.mfaOk || (user.role !== "admin" && user.role !== "professor")) return new NextResponse("Forbidden", { status: 403 });
   const { id } = await ctx.params;
   if (!z.guid().safeParse(id).success) return new NextResponse("Bad id", { status: 400 });
   const supabase = await createClient();

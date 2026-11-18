@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { mfaEnforced, mfaSatisfied } from "@/lib/mfa";
 import type { Role } from "@/lib/roles";
 
 export type CurrentUser = {
@@ -9,6 +10,8 @@ export type CurrentUser = {
   email: string | null;
   fullName: string;
   role: Role;
+  /** false = admin/operator signed in with password only while MFA is enforced (must pass /account/security). */
+  mfaOk: boolean;
 };
 
 /**
@@ -27,11 +30,25 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     .eq("id", userId)
     .maybeSingle();
   if (!profile || !profile.is_active) return null;
-  return { id: profile.id, email: profile.email, fullName: profile.full_name, role: profile.role };
+  const aal = typeof data?.claims?.aal === "string" ? data.claims.aal : undefined;
+  return {
+    id: profile.id,
+    email: profile.email,
+    fullName: profile.full_name,
+    role: profile.role,
+    mfaOk: mfaSatisfied(profile.role, aal, mfaEnforced()),
+  };
 });
 
 /** Use at the top of every portal layout, page loader, Server Action and Route Handler. */
 export async function requireRole(...roles: Role[]): Promise<CurrentUser> {
+  const user = await requireRoleBeforeMfa(...roles);
+  if (!user.mfaOk) redirect("/account/security?mfa=required");
+  return user;
+}
+
+/** Same role check without the MFA step: only for the page where the second factor is set up / entered. */
+export async function requireRoleBeforeMfa(...roles: Role[]): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!roles.includes(user.role)) redirect("/forbidden");
@@ -44,5 +61,6 @@ export async function assertRole(...roles: Role[]): Promise<CurrentUser> {
   if (!user || !roles.includes(user.role)) {
     throw new Error("Not allowed");
   }
+  if (!user.mfaOk) throw new Error("Two-factor authentication required");
   return user;
 }

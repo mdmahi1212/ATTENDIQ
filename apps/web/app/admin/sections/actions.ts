@@ -67,20 +67,25 @@ export const removeStaff = formAction({
  */
 export const startTestSession = formAction({
   roles: ["admin"],
-  schema: z.object({ id: z.guid(), minutes: z.coerce.number().int().min(10).max(240).default(30) }),
+  schema: z.object({
+    id: z.guid(),
+    minutes: z.coerce.number().int().min(10).max(240).default(30),
+    // Demo: start the class N minutes in the past so a walk-in now counts as late (demo script step 6).
+    started_minutes_ago: z.coerce.number().int().min(0).max(60).default(0),
+  }),
   revalidate: "/admin/sections",
-  run: async ({ id, minutes }, { supabase }) => {
+  run: async ({ id, minutes, started_minutes_ago }, { supabase }) => {
     const { data: section } = check(await supabase.from("sections").select("room_id").eq("id", id).single());
     if (!section?.room_id) return { ok: false, message: "Give the section a room first." };
     const { data: sessionId } = check(
       await createAdminClient().rpc("create_adhoc_session", {
         p_room: section.room_id,
         p_section: id,
-        p_starts_at: new Date().toISOString(),
+        p_starts_at: new Date(Date.now() - started_minutes_ago * 60_000).toISOString(),
         p_minutes: minutes,
         p_simulation: false,
       }),
     );
-    return `Test session started now for ${minutes} min (id ${String(sessionId).slice(0, 8)}…). Enrolled students are 'pending' until the gate camera sees them.`;
+    return `Test session started ${started_minutes_ago ? `${started_minutes_ago} min ago` : "now"} for ${minutes} min (id ${String(sessionId).slice(0, 8)}…). Enrolled students are 'pending' until the gate camera sees them.`;
   },
 });

@@ -13,8 +13,45 @@ Last updated: 2026-11-18
 | 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
 | 5 Edge + MQTT + ingest + simulator | LIVE TEST PASSED — only the recorded-video check is open | see Gate 5 below |
 | 6 Occupancy + live dashboard + self-verify | DONE (commit c53a737) | see Gate 6 below |
-| 7 Recheck, finalize, appeals, reports | DONE — waiting for "continue" | see Gate 7 below |
-| 8 ESP32, hardening, docs | not started | |
+| 7 Recheck, finalize, appeals, reports | DONE (commit ea450a3) | see Gate 7 below |
+| 8 ESP32, hardening, docs | BUILT — gate needs the user's live demo + Wi-Fi cut | see Gate 8 below |
+
+## Gate 8 status (2026-11-19) — Definition of Done
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Fresh clone + README reach a running system | ⏳ README quick start written (`README.md`), every step was exercised in this project, but **not replayed on a second, clean laptop** |
+| 2 | All automated tests pass; lint + typecheck + build clean | ✅ SQL: rule_engine 95, manual_mark 9, appeals 19, **rls_matrix 13 (62 probes)**, **privacy_ops 9** · Vitest 114 · Playwright 10/10 (dev) and 10/10 against the **production build with CSP** (0 console errors on admin pages incl. the map) · pytest face-api 20, edge 31, ingest 7, simulator 11 (+ Gate 7 live), pycommon 5 · ruff, eslint, tsc, next build |
+| 3 | Live 10-step demo works with the user's phones (user confirms each step) | ⏳ NOT DONE — script in `docs/DEMO_SCRIPT.md`; steps 2, 4, 5, 7 (after the fix), 10 were each already shown live in Gates 4-7 |
+| 4 | Cutting the Wi-Fi for 1 minute loses no events | ✅ simulated: ingest pointed at an unreachable API for 60 s while a 115-event class was published (0 events reached the DB), then the ingest process was **killed** and restarted: the broker redelivered all unacked QoS 1 messages -> **112/112 unique events stored** (3 duplicates ignored), statuses correct, backlog drained in 6.5 s. Edge outbox replay after a broker outage was verified in Phase 5. ⏳ The literal Wi-Fi unplug with the user is still to do |
+| 5 | `docs/CISCO_LAYERS.md` maps every component to a layer | ✅ |
+
+### Phase 8 decisions / notes
+- **Rate limits** (migration 15 `rate_limits` + `rate_limit_hit`, fixed window in Postgres so all Vercel instances share it): self-verify 10/min/student, manual-check 3/10 min, face enroll 5/h, every edge API 600/min/device. Fails open (logged) if the DB call itself fails.
+- **CSP** (production builds only; dev needs eval): `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'` (MediaPipe WASM; no eval / new Function in MediaPipe or html5-qrcode — checked), Supabase https + wss, OSM tiles, blob workers, `frame-ancestors 'none'`, `object-src 'none'`; plus HSTS. `upgrade-insecure-requests` dropped (breaks the production build over local http; production is https-only + HSTS anyway). `'unsafe-inline'` scripts remain because Next's bootstrap is inline without nonces.
+- **MFA**: with `ENFORCE_MFA=true` every admin/operator page, Server Action and staff API needs an `aal2` session; aal1 sessions are sent to `/account/security` to enroll TOTP or enter the code of an existing factor. Default off (dev + e2e). ⚠️ **Not yet enabled in production** — turning it on forces the admin accounts to set up an authenticator, so it needs the user's go-ahead.
+- **Privacy retention** (`privacy_retention`, pg_cron daily 03:00 KST): unknown-entrant snapshot references after 24 h, rate-limit rows after 1 day, notifications after 90 days, heartbeats after 30 days; then `/api/internal/retention` (pg_net + webhook secret) removes face-review thumbnails once the profile left `review`, and appeal evidence 180 days after the decision. Verification frames are never stored (only scores). Raw enrollment photos are never stored.
+- **RLS matrix** (`supabase/tests/rls_matrix.test.sql`): RLS on every table; policies on every table except the service-only `session_secrets`, `rate_limits`; all views `security_invoker`; anon reads 0 rows everywhere; per-role forbidden reads/writes (student, professor of another section, own professor, operator) all refused.
+- **Demo reset**: `reset_demo()` (service only) + `scripts/reset-demo.ps1` (asks for `RESET`): deletes simulation + ad-hoc sessions with everything attached, clears device health and rate limits; keeps people, faces, timetable sessions, settings. Tested in a rolled-back transaction only.
+- **ESP32**: `firmware/esp32-door-led/esp32-door-led.ino` (PubSubClient, GPIO 25 green / 26 red via 220 Ω, 1.5 s, WiFi + MQTT reconnect with backoff, `secrets.h` gitignored). **Not compiled or flashed** (no Arduino toolchain / board here).
+- Admin -> Sections got **"Demo: class started 12 min ago"** for demo step 6 (late).
+- Docs: `README.md` quick start, `docs/DEMO_SCRIPT.md`, `docs/CISCO_LAYERS.md`, `docs/TESTING.md` (all suites + measured metrics; gate FAR/FRR on a real multi-person set is still open).
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| Edge log `camera gate OFFLINE` | Phone #1 asleep or IP Webcam stopped (start the server again), or its IP changed (DHCP): read the new address in the app, update `GATE_CAMERA_SOURCE` in `apps/edge/.env`, restart the edge. Keep the phone on a charger with the screen-off option of IP Webcam. |
+| Faces never recognised, scores ~0.1-0.2 | Picture sideways: phone in portrait -> `gate.rotate: 90` in `apps/edge/config.yaml`. Or the gallery is stale (student re-enrolled): the edge refreshes every 60 s; force it with `reload_gallery` (ingest re-sends control) or restart the edge. |
+| Laptop clock warning in the edge log | Windows clock is off; the edge corrects timestamps with the server offset, but sync it (Settings -> Time -> Sync now). |
+| `face service is offline` on enroll / verify | face-api or its tunnel stopped: `scripts\start-face-api.ps1` (it publishes the new quick-tunnel URL itself via the edge device key). `curl <tunnel>/health` must show `"liveness": true`. |
+| Port 1883 in use | The Mosquitto Windows service from the installer: run with `-MqttPort 1884`, or once in an admin PowerShell `Stop-Service mosquitto; Set-Service mosquitto -StartupType Manual`. |
+| ESP32 never connects | Broker must listen on `0.0.0.0` (project config does), Windows Firewall must allow inbound TCP 1883 on the private network, user `esp32-B204` must exist in `infra/mosquitto/passwd`. |
+| Push not arriving | Notifications on in Settings for that phone; Android: battery optimisation off for Chrome. **iOS**: only works for the app added to the Home Screen (iOS 16.4+), not in Safari tabs. Check `/notifications` (inbox works without push). Webhook secret mismatch -> `node scripts/rotate-webhook-secret.mjs` + redeploy. |
+| `onnxruntime` / `onnx` DLL blocked on Windows | Windows Smart App Control must be off. |
+| InsightFace pip install tries to compile | Use Python 3.11 (wheels exist); otherwise install "Desktop development with C++" Build Tools. |
+| Self-verify fails with "looked like a picture" for a real face | Bad light / laptop webcam (low anti-spoof scores); use the phone camera in good light; `LIVENESS_THRESHOLD` (0.8) in `apps/face-api/.env`. |
+| No verify push even though more people are inside | Only a **stable** count (unchanged 60 s) younger than 2 min counts, the first check is at T0+10, and `staff_count` (default 1) is subtracted. |
 
 ## Gate 7 results (2026-11-19) — PASSED
 
@@ -278,3 +315,4 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 9. Gate 4 left a test student `student1@attendence.test` (password: `DUP_TEST_STUDENT_PASSWORD` in `apps/web/.env.local`) in face status `review`. Its 10 embeddings and thumbnail are **your face**: try Approve/Reject in /admin/faces, then have it deleted.
 10. **Sync the Windows clock** (it is ~2.5 min slow): Settings -> Time & language -> Date & time -> turn on "Set time automatically" -> "Sync now". The edge corrects for it anyway, but other tools trust the clock.
 11. **Free MQTT port 1883** for the project broker, once, in an ADMIN PowerShell: `Stop-Service mosquitto; Set-Service mosquitto -StartupType Manual` (or always start with `scripts\start-classroom.ps1 -MqttPort 1884`).
+12. Decide when to set **`ENFORCE_MFA=true` in Vercel** (admin/operator two-factor); before that, set up TOTP for your admin account on `/account/security`.

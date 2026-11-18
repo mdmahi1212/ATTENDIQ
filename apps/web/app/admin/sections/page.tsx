@@ -56,6 +56,13 @@ export default async function SectionsPage() {
                       variant="outline"
                       confirm="Start a real attendance session for this section now (30 min)? Enrolled students who are not seen will be marked absent at the end."
                     />
+                    <RowAction
+                      action={startTestSession}
+                      fields={{ id: s.id, minutes: "45", started_minutes_ago: "12" }}
+                      label="Demo: class started 12 min ago"
+                      variant="outline"
+                      confirm="Start a real session whose start time is 12 minutes ago (walk-ins now count as late)?"
+                    />
                     <RowAction action={deleteSection} fields={{ id: s.id }} label="Delete" variant="destructive" confirm="Delete this section?" />
                   </span>
                 </CardTitle>

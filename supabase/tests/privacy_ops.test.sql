@@ -1,0 +1,20 @@
+-- Rate limiting, demo reset, retention job (migration 15). One transaction, rolled back.
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
+create temp table tap (n serial primary key, line text);
+select no_plan();
+insert into tap(line) select ok(public.rate_limit_hit('test:x', 2, 60), 'rate limit: 1st hit allowed');
+insert into tap(line) select ok(public.rate_limit_hit('test:x', 2, 60), 'rate limit: 2nd hit allowed');
+insert into tap(line) select ok(not public.rate_limit_hit('test:x', 2, 60), 'rate limit: 3rd hit in the window blocked');
+insert into tap(line) select ok(public.rate_limit_hit('test:y', 2, 60), 'rate limit: other keys are independent');
+create temp table tt as select count(*) as n from public.class_sessions where slot_id is not null and not is_simulation;
+select public.reset_demo();
+insert into tap(line) select is((select count(*) from public.class_sessions where is_simulation or slot_id is null), 0::bigint, 'reset_demo removes simulation + ad-hoc sessions');
+insert into tap(line) select is((select count(*) from public.class_sessions where slot_id is not null and not is_simulation), (select n from tt), 'reset_demo keeps timetable sessions');
+insert into tap(line) select is((select count(*) from public.rate_limits), 0::bigint, 'reset_demo clears rate limit counters');
+insert into tap(line) select ok(public.privacy_retention() ? 'snapshots_expired', 'privacy_retention runs');
+insert into tap(line) select is((select schedule from cron.job where jobname = 'privacy-retention'), '0 18 * * *', 'retention scheduled daily at 03:00 Asia/Seoul');
+insert into tap(line) select * from finish();
+select string_agg(line, E'\n' order by n) as tap from tap;
+rollback;

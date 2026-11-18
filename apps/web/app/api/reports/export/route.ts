@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 /** Course report CSV for professors (own sections, via RLS) and admins. */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "admin" && user.role !== "professor")) return new NextResponse("Forbidden", { status: 403 });
+  if (!user || !user.mfaOk || (user.role !== "admin" && user.role !== "professor")) return new NextResponse("Forbidden", { status: 403 });
   const parsed = reportFilterSchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success) return new NextResponse("Bad filter", { status: 400 });
   const { summary } = await loadReport(parsed.data);

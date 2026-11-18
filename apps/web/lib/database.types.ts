@@ -979,6 +979,24 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          hits: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          hits?: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          hits?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           building: string | null
@@ -1520,6 +1538,11 @@ export type Database = {
       }
       pol_int: { Args: { d: number; k: string; p: Json }; Returns: number }
       pol_num: { Args: { d: number; k: string; p: Json }; Returns: number }
+      privacy_retention: { Args: { p_now?: string }; Returns: Json }
+      rate_limit_hit: {
+        Args: { p_key: string; p_limit: number; p_window_s: number }
+        Returns: boolean
+      }
       record_evidence: {
         Args: {
           p_at: string
@@ -1537,6 +1560,7 @@ export type Database = {
         Args: { p_now?: string; p_session: string }
         Returns: number
       }
+      reset_demo: { Args: never; Returns: Json }
       run_count_checks: {
         Args: { p_now?: string; p_session: string }
         Returns: undefined

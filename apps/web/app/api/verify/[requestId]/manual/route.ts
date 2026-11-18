@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
+import { rateLimited } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadRequestContext } from "@/lib/verify/server";
 
@@ -10,6 +11,8 @@ export const runtime = "nodejs";
 export async function POST(_request: NextRequest, ctx: RouteContext<"/api/verify/[requestId]/manual">) {
   const user = await getCurrentUser();
   if (!user || user.role !== "student") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const limited = await rateLimited("manualCheck", user.id);
+  if (limited) return limited;
   const { requestId } = await ctx.params;
   if (!z.guid().safeParse(requestId).success) return NextResponse.json({ ok: false, error: "bad id" }, { status: 400 });
   const admin = createAdminClient();

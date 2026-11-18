@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authenticateDevice } from "@/lib/device-auth";
+import { rateLimited } from "@/lib/rate-limit";
 import { faceApiUrlSchema } from "@/lib/face/url";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -13,6 +14,8 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const device = await authenticateDevice(request, ["edge"]);
   if (!device) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const limited = await rateLimited("device", device.id);
+  if (limited) return limited;
   const parsed = z.object({ url: faceApiUrlSchema }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "url must be https://<hostname>" }, { status: 400 });
   const { error } = await createAdminClient().rpc("set_app_config", { p_key: "face_api_url", p_value: parsed.data.url });

@@ -1336,7 +1336,13 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      rooms_geo: {
+        Row: {
+          geofence: Json | null
+          id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_attendance_flag: {

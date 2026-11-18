@@ -109,6 +109,13 @@ insert into tap(line) select is((select role::text from public.profiles where id
   'student', 'self sign-up claiming role=admin in user metadata becomes student');
 insert into tap(line) select is((select role::text from public.profiles where id = tests.prof()),
   'professor', 'role from app metadata is honoured');
+-- Auth admin createUser inserts first and writes app_metadata.role afterwards: the profile must follow.
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role":"operator"}' where id = 'fc000000-0000-4000-8000-000000000001';
+insert into tap(line) select is((select role::text from public.profiles where id = 'fc000000-0000-4000-8000-000000000001'),
+  'operator', 'a later app_metadata.role change (service role only) syncs the profile role');
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"role":"nonsense"}' where id = 'fc000000-0000-4000-8000-000000000001';
+insert into tap(line) select is((select role::text from public.profiles where id = 'fc000000-0000-4000-8000-000000000001'),
+  'operator', 'an unknown app_metadata role is ignored');
 insert into tap(line) select is((select status from public.face_profiles where student_id = tests.s(1)),
   'pending', 'new student gets a pending face profile');
 insert into tap(line) select ok((select count(*) from public.notifications where user_id = tests.s(1) and type = 'enroll_face') = 1,

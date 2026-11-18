@@ -1,6 +1,6 @@
 # PROGRESS
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 ## Phase status
 
@@ -292,7 +292,7 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 - Whole classroom stack: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1` (Mosquitto, face-api + tunnel, ingest, edge; logs in `logs\`).
 - Simulator: `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run` (MQTT) or `... run --direct` (HTTP); Gate 7 check: `... run --direct --finalize` or `$env:SIM_LIVE='1'; .\.venv\Scripts\python.exe -m pytest tests\test_gate7_live.py`.
 - Face API + tunnel: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1` (keep the window open while students enroll).
-- Face threshold eval: `appsace-api\.venv\Scripts\python.exe scriptsace-eval.py eval --out docsace-eval.md`.
+- Face threshold eval: `apps\face-api\.venv\Scripts\python.exe scripts\face-eval.py eval --out docs\face-eval.md`.
 - Regenerate types: `npx supabase gen types typescript --linked > apps/web/lib/database.types.ts` (after `npx supabase login` + `link`).
 
 ## Open issues / later phases

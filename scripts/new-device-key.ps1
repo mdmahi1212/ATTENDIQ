@@ -61,7 +61,7 @@ if ($MqttUser) {
     Write-Host "MQTT user : $MqttUser"
     Write-Host "MQTT pass : $mqttPw" -ForegroundColor Yellow
     Write-Host '            ^ copy it into the device .env (MQTT_USERNAME / MQTT_PASSWORD). Only its hash is stored in infra/mosquitto/passwd.'
-    if (-not (Select-String -Path (Join-Path $root 'infra\mosquittocl') -Pattern "^user $MqttUser$" -Quiet)) {
+    if (-not (Select-String -Path (Join-Path $root 'infra\mosquitto\acl') -Pattern "^user $MqttUser$" -Quiet)) {
         Write-Warning "Add a 'user $MqttUser' block to infra/mosquitto/acl, then restart Mosquitto."
     }
 }

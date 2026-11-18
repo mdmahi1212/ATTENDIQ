@@ -57,5 +57,5 @@ for (const [key, value, sensitive] of vars) {
     console.log(`FAIL  ${key}: ${msg}`);
   }
 }
-console.log(failed ? `\n${failed} variable(s) failed.` : "\nAll ${vars.length} variables are set for Production and Preview. Now redeploy.");
+console.log(failed ? `\n${failed} variable(s) failed.` : `\nAll ${vars.length} variables are set for Production and Preview. Now redeploy.`);
 process.exit(failed ? 1 : 0);

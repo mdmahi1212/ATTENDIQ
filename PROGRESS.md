@@ -10,13 +10,13 @@ Last updated: 2026-11-18
 | 1 Database | DONE (commit 1a130c2) | see Gate 1 below |
 | 2 Web foundation | DONE (commit 5a4f6f0) | see Gate 2 below |
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
-| 4 Face API + enrollment | BUILT — gate needs the user's phone test | see Gate 4 below |
+| 4 Face API + enrollment | DONE — waiting for "continue" | see Gate 4 below |
 | 5 Edge + MQTT + ingest + simulator | not started | |
 | 6 Occupancy + live dashboard + self-verify | not started | |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
 
-## Gate 4 status (2026-11-18)
+## Gate 4 results (2026-11-18) — PASSED
 
 | Check | Result |
 |---|---|
@@ -27,8 +27,10 @@ Last updated: 2026-11-18
 | face-api through the tunnel | ✅ `scripts/start-face-api.ps1` → quick tunnel `https://<random>.trycloudflare.com/health` OK, `/embed` 401 without secret, 2 embeddings with it; URL stored in `private.app_config.face_api_url` |
 | `/api/face/enroll` end-to-end (local dev server + real face-api, Playwright, test accounts removed afterwards) | ✅ no session → 401; no consent → 403; consent via UI → 6 embeddings stored, `face_profiles.status = active`, template set, model `insightface-buffalo_l`; second attempt → 409; **same face on a second account → `review`** with note naming the first student (similarity 1.00); different face → `active` |
 | `scripts/face-eval.py` | ✅ runs; `docs/face-eval.md` holds only a pipeline smoke test (synthetic genuine pairs). **NOT VERIFIED on real photos** — needs `eval/<person>/` photos |
-| **User enrolls on the phone → active with ≥ 5 embeddings** | ⏳ NOT VERIFIED — needs the deployed build + the user's phone (camera, MediaPipe on mobile, liveness thresholds on a real face) |
-| **Duplicate check flags a second account with the user's face** | ⏳ NOT VERIFIED on the phone (passes in the local e2e above) |
+| **User enrolls on the phone → active with ≥ 5 embeddings** | ✅ USER ENROLLED on the Android phone via production (07:06:21 UTC): liveness smile/turn_right/turn_left passed; face-api got 10 photos, accepted 9 (one `down` shot rejected by a quality gate); `face_profiles.status = active`, **9 embeddings** (front×2, left×2, right×2, up×2, down×1, det_score 0.70–0.84), template set, consent row present |
+| **Duplicate check flags a second account with the user's face** | ✅ USER TESTED on the phone (07:17:29 UTC): test account `student1@attendence.test` enrolled with the user's face → 10/10 photos accepted → `face_profiles.status = review`, note "possible duplicate of student c244f101… (similarity 0.90)", 160 px thumbnail (3.1 KB) stored in `face-review` |
+| Real-world similarity | Same person, two separate phone sessions 11 minutes apart: **0.90** best match (duplicate threshold 0.60, gate threshold 0.45) |
+| NOT VERIFIED | Admin review queue rendering the thumbnail (signed URL) on the deployed site — not opened yet; iPhone/Safari camera + MediaPipe (only Android Chrome tested); threshold report on real multi-person photos (`docs/face-eval.md` is a smoke test) |
 
 ### Phase 4 decisions / notes
 - **InsightFace 2.1** installs from a wheel on Windows/Python 3.11: no MSVC Build Tools needed. **Smart App Control had to be turned off** (it blocks onnx/onnxruntime DLLs); the user did it.
@@ -190,3 +192,4 @@ repo-root `.env` with `SUPABASE_DB_URL` does not exist yet. It was syntax-checke
 6. ~~Vercel + GitHub (Phase 3)~~ (done). Optional: Cloudflare account + domain for a fixed face-api hostname (named tunnel); the quick tunnel works without one.
 7. Push new commits yourself (`git push`): this session is not allowed to push. Vercel redeploys production on every push to `main`.
 8. After rotating the Supabase secret key: update `apps/web/.env.local`, run `node scripts/push-vercel-env.mjs` from `apps/web`, then redeploy.
+9. Gate 4 left a test student `student1@attendence.test` (password: `DUP_TEST_STUDENT_PASSWORD` in `apps/web/.env.local`) in face status `review`. Its 10 embeddings and thumbnail are **your face**: try Approve/Reject in /admin/faces, then have it deleted.

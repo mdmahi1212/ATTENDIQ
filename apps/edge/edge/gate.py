@@ -69,6 +69,10 @@ class GatePipeline:
         self.memory.clear()
         log.info("session %s started, gallery %d students", session_id, len(self.gallery))
 
+    def reload_gallery(self, gallery_data: dict[str, Any]) -> None:
+        """New/changed enrollments mid-session: swap the faces only; keep tracks and who is already marked."""
+        self.gallery.load(gallery_data)
+
     def stop(self) -> None:
         self.session_id = None
         self.gallery.clear()  # biometric data only lives in RAM during a session

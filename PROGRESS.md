@@ -11,24 +11,31 @@ Last updated: 2026-11-18
 | 2 Web foundation | DONE (commit 5a4f6f0) | see Gate 2 below |
 | 3 PWA + push + deploy | DONE (commit df75206) | see Gate 3 below |
 | 4 Face API + enrollment | DONE (commit 85333a9) | see Gate 4 below |
-| 5 Edge + MQTT + ingest + simulator | BUILT — gate needs the user's recording + live walk-past | see Gate 5 below |
+| 5 Edge + MQTT + ingest + simulator | LIVE TEST PASSED — only the recorded-video check is open | see Gate 5 below |
 | 6 Occupancy + live dashboard + self-verify | not started | |
 | 7 Recheck, finalize, appeals, reports | not started | |
 | 8 ESP32, hardening, docs | not started | |
 
-## Gate 5 status (2026-11-18)
+## Gate 5 status (2026-11-18) — live test passed
 
 | Check | Result |
 |---|---|
-| pytest edge / ingest / simulator / pycommon | ✅ 24 / 7 / 7 / 5 (edge: line crossing, IoU tracker, voting rule incl. ambiguous + tied votes, dedupe + re-entry, outbox offline replay + idempotency + restart, camera offline/online + backoff, gate pipeline walk-in/out/stranger/small faces/presence mode, **2 tests on the real buffalo_l model**: enrolled face walking in -> RECOGNISED (score > 0.6), stranger -> UNKNOWN) · ruff clean |
+| pytest edge / ingest / simulator / pycommon | ✅ 25 / 7 / 7 / 5 (edge: line crossing, IoU tracker, voting rule incl. ambiguous + tied votes, dedupe + re-entry, outbox offline replay + idempotency + restart, camera offline/online + backoff, gate pipeline walk-in/out/stranger/small faces/presence mode, **2 tests on the real buffalo_l model**: enrolled face walking in -> RECOGNISED (score > 0.6), stranger -> UNKNOWN) · ruff clean |
 | web lint / typecheck / vitest / build | ✅ / ✅ / 89 / ✅ |
 | **Simulator: 30 simulated students get the correct statuses in the DB** | ✅ twice: over HTTP (`--direct`) and over the real IoT path simulator -> Mosquitto -> ingest -> API -> DB: 30/30 statuses (22 present, 5 late, 3 pending) and 30/30 flags (gate_out, reentry); 112 events stored, 3 duplicate event_ids ignored, unknown visitor logged, 0 real students touched |
 | Edge process end to end (video file -> InsightFace -> MQTT + outbox -> ingest -> DB) | ✅ MQTT control `start` -> gallery fetched (RAM only) -> IN + UNKNOWN + camera online/offline + heartbeat stored via ingest-B204; outbox drained (0 unsent). Synthetic video (sample photo face), not a real recording |
 | Device auth boundaries | ✅ no/bad key 401; simulator key on gallery 401; edge key on demo-session 401; other room 403; > 500 events 400 |
 | Broker ACL | ✅ wrong password refused; simulator publishing `control` dropped; ingest `control` delivered to edge |
 | Recorded video in `apps/edge/samples/` -> recognised entry | ⏳ NOT VERIFIED — needs the user's recording (instructions: `apps/edge/samples/README.md`) |
-| **LIVE: user walks past phone #1 -> `present`** | ⏳ NOT VERIFIED — needs phone #1 + the deployed routes |
-| Latency observed_at -> DB | ⏳ to be measured in the live test. Pipeline delay locally ~1 s; see clock finding below |
+| **LIVE: user walks past phone #1 -> `present`** | ✅ 11:52:03 UTC, session 2a62dd17 (ad-hoc, IOT401-01, B204): phone #1 (IP Webcam, portrait -> `rotate: 90`, `entry_mode: presence`) -> edge -> Mosquitto -> ingest -> production API -> `attendance.status = present`, method `gate`, 9.4 min after T0, score 0.78, 5/5 crops agree |
+| **Latency observed_at -> DB** | ✅ **0.99 s** (edge clock corrected by +154 s to server time) |
+| SQL tests after migrations 10 + 11 | ✅ 95/95 (2 new: a second sighting without an OUT is not a re-entry) |
+
+### Problems found by the live test (fixed)
+- **Sideways stream:** IP Webcam on a phone held in portrait streams the landscape sensor image, so no face was detected upright. Added `gate.rotate` (0/90/180/270) and `--rotate`; phone #1 needs 90.
+- **Stale gallery:** the student re-enrolled mid-session (consent withdrawn 11:47:25 -> re-enrolled 11:49:33); the edge still held the old faces (score 0.16 -> "unknown"). The edge now refreshes the gallery every 60 s (`gallery_refresh_seconds`) and on `reload_gallery` WITHOUT clearing who is already marked. After the refresh: recognised at 0.78 within 1 s.
+- **False re-entry flag:** an edge restart re-reported a student standing in view and the server flagged `reentry`. Migration 11 (`20261118115427_reentry_requires_gate_out`): re-entry only after a gate OUT for that student. The flag on the live-test row (session 2a62dd17) was created before the fix and is left as is.
+- **Face service offline:** the face-api/tunnel stopped when the earlier Claude session ended; `start-face-api.ps1` now publishes the new tunnel URL by itself through `POST /api/edge/v1/face-api-url` (edge device key), verified.
 
 ### Phase 5 decisions / notes
 - **Laptop clock is ~2.5 min slow** (measured vs Vercel/Supabase: 153-156 s). That would turn late arrivals into "present". The edge now measures its offset from the server's HTTP `Date` header on every API call (median of 9) and stamps events with corrected time; heartbeats report `clock_offset_s` and the log warns above 5 s. The user should still sync Windows time.

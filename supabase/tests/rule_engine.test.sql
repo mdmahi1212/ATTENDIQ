@@ -183,6 +183,12 @@ select tests.apply(jsonb_build_array(
 insert into tap(line) select is(tests.st(tests.sid(1), tests.s(1)), 'present', 're-entry: status unchanged (present)');
 insert into tap(line) select ok((tests.att(tests.sid(1), tests.s(1))).flags @> array['gate_out','reentry'], 're-entry: gate_out + reentry flags');
 insert into tap(line) select is((tests.att(tests.sid(1), tests.s(1))).first_seen_at, tests.t(1, 2), 're-entry: first_seen_at unchanged');
+-- Seen twice WITHOUT an OUT in between (edge restart / standing in view): not a re-entry (migration 11).
+select tests.apply(jsonb_build_array(
+  tests.rec(tests.sid(1), tests.s(2), tests.t(1, 3)),
+  tests.rec(tests.sid(1), tests.s(2), tests.t(1, 6))));
+insert into tap(line) select is(tests.st(tests.sid(1), tests.s(2)), 'present', 'second sighting: still present');
+insert into tap(line) select ok(not ((tests.att(tests.sid(1), tests.s(2))).flags && array['reentry']), 'second sighting without OUT: no reentry flag');
 
 -- ============================================================ C: offline replay with old observed_at
 select tests.session(2);

@@ -35,6 +35,7 @@ class Env(BaseSettings):
 
 class GateYaml(BaseModel):
     process_every_nth: int = 2
+    rotate: int = 0  # clockwise degrees (0/90/180/270) applied to gate frames before detection
     det_size: int = 640
     min_face_px: int = 60
     min_det_score: float = 0.6
@@ -60,6 +61,7 @@ class EdgeYaml(BaseModel):
     room_code: str | None = None
     gate: GateYaml = GateYaml()
     heartbeat_seconds: float = 15
+    gallery_refresh_seconds: float = 60
     control_poll_seconds: float = 15
 
 

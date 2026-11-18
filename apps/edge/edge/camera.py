@@ -131,3 +131,11 @@ class Camera:
             self.failures += 1
             self._set_online(False)
             self._sleep(backoff.next())
+
+
+def rotate_frame(frame: np.ndarray, degrees: int) -> np.ndarray:
+    """Clockwise rotation for phones streaming sideways (IP Webcam sends the sensor's landscape image)."""
+    import cv2
+
+    codes = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+    return frame if degrees % 360 == 0 else cv2.rotate(frame, codes[degrees % 360])

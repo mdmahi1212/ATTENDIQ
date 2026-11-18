@@ -22,7 +22,7 @@ import psutil
 from attendiq_common import topics
 from attendiq_common.api import EdgeApi, EdgeApiError
 from attendiq_common.envelope import Envelope, EventType
-from edge.camera import Camera
+from edge.camera import Camera, rotate_frame
 from edge.config import Env, load_yaml, resolve
 from edge.gallery import Gallery
 from edge.gate import GatePipeline
@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--video", help="video file instead of the live gate camera")
     ap.add_argument("--direct", action="store_true", help="POST events to the API instead of MQTT")
     ap.add_argument("--presence", action="store_true", help="entry_mode=presence (overrides config.yaml)")
+    ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], help="rotate gate frames clockwise (overrides config.yaml)")
     args = ap.parse_args(argv)
 
     env = Env()  # type: ignore[call-arg]
@@ -105,6 +106,14 @@ def main(argv: list[str] | None = None) -> int:
             current = str(gate.session_id) if gate.session_id else None
             if session_id == current and reason != "reload":
                 return
+            if reason == "reload" and session_id == current:
+                try:
+                    gate.reload_gallery(api.gallery(session_id))
+                except EdgeApiError as e:
+                    log.warning("gallery refresh failed: %s", e)
+                    return
+                log.info("gallery refreshed: %d students", len(gallery))
+                return
             if not session_id:
                 if current:
                     log.info("session stop (%s)", reason)
@@ -166,11 +175,12 @@ def main(argv: list[str] | None = None) -> int:
     from edge.detector import InsightFaceDetector
 
     detector = InsightFaceDetector(resolve(env.insightface_home), cfg.gate.det_size)
-    log.info("detector ready; room %s; source %s; mode %s", room, source, gate_cfg.entry_mode)
+    log.info("detector ready; room %s; source %s; mode %s; rotate %s", room, source, gate_cfg.entry_mode,
+             args.rotate if args.rotate is not None else cfg.gate.rotate)
 
     # ------------------------------------------------------------ heartbeat + session poll
     def background() -> None:
-        next_hb, next_poll = 0.0, 0.0
+        next_hb, next_poll, next_gallery = 0.0, 0.0, time.monotonic() + cfg.gallery_refresh_seconds
         while not stop.is_set():
             now = time.monotonic()
             if now >= next_poll:
@@ -182,6 +192,10 @@ def main(argv: list[str] | None = None) -> int:
                     log.warning("session poll failed: %s", e)
                 if args.direct:
                     publisher.replay()
+            if now >= next_gallery:
+                next_gallery = now + cfg.gallery_refresh_seconds
+                if gate.session_id:
+                    set_session(str(gate.session_id), "reload")
             if now >= next_hb:
                 next_hb = now + cfg.heartbeat_seconds
                 age = camera.frame_age()
@@ -199,6 +213,7 @@ def main(argv: list[str] | None = None) -> int:
 
     threading.Thread(target=background, daemon=True, name="background").start()
 
+    rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
     last_seq, n = -1, 0
     try:
@@ -214,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
             n += 1
             if n % max(1, cfg.gate.process_every_nth):
                 continue
+            frame = rotate_frame(frame, rotation)
             faces = detector(frame)
             gate.process(faces, frame.shape[1], frame.shape[0], time.monotonic())
     except KeyboardInterrupt:

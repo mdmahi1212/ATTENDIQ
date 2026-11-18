@@ -3,6 +3,7 @@ room_code: B204
 
 gate:
   process_every_nth: 2        # run face detection on every Nth new frame (CPU budget)
+  rotate: 0                   # clockwise degrees; 90 for a phone held in PORTRAIT with IP Webcam (it streams sideways)
   det_size: 640               # SCRFD input size
   min_face_px: 60             # smaller faces are tracked but not used for recognition
   min_det_score: 0.6
@@ -21,4 +22,5 @@ gate:
   min_votes: 2
 
 heartbeat_seconds: 15
+gallery_refresh_seconds: 60   # re-fetch the session gallery (students who enroll during class)
 control_poll_seconds: 15      # fallback HTTP poll of the current session if no MQTT control arrives

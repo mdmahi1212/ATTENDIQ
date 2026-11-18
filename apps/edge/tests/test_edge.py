@@ -272,3 +272,14 @@ def test_no_session_no_events_and_stop_wipes_gallery() -> None:
     pipe.stop()
     walk(pipe, lambda i: near(A, 0.7, 100 + i), [150, 200, 250, 300, 350])
     assert events == [] and len(pipe.gallery) == 0
+
+
+def test_gallery_reload_keeps_who_is_already_marked() -> None:
+    pipe, events, _ = make_pipe()
+    walk(pipe, lambda i: near(A, 0.7, 100 + i), [150, 200, 250, 300, 350])
+    c = unit(3)
+    pipe.reload_gallery({"students": [*GALLERY["students"], {"id": "stu-c", "embeddings": [c.tolist()]}]})
+    walk(pipe, lambda i: near(A, 0.7, 500 + i), [150, 200, 250, 300, 350], t0=10)  # A again: still deduped
+    walk(pipe, lambda i: near(c, 0.7, 600 + i), [150, 200, 250, 300, 350], t0=20)  # newly enrolled C recognised
+    rec = [e.payload["student_id"] for e in events if e.event_type.value == "GATE_ENTRY_RECOGNISED"]
+    assert rec == ["stu-a", "stu-c"]

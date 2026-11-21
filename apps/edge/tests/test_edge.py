@@ -329,3 +329,14 @@ def test_exit_then_entry_at_the_door_is_a_reported_reentry() -> None:
     walk(entry, lambda i: near(A, 0.7, 300 + i), [150, 200, 250, 300, 350], t0=20)  # comes back
     assert types(exit_events) == ["GATE_PERSON_OUT"]
     assert types(entry_events).count("GATE_ENTRY_RECOGNISED") == 2
+
+
+def test_exit_camera_in_presence_mode_marks_any_recognised_face_as_out() -> None:
+    from edge.config import ExitYaml, GateYaml
+
+    events: list[Envelope] = []
+    cfg = ExitYaml(enabled=True, mode="presence").to_gate_config(GateYaml())
+    pipe = GatePipeline(cfg, Gallery(), DEV, events.append, None, clock=lambda: datetime(2026, 11, 22, 2, 0, tzinfo=UTC))
+    pipe.start(uuid.uuid4(), GALLERY)
+    walk(pipe, lambda i: near(A, 0.7, 100 + i), [240] * 10)  # stands in front of the way-out camera
+    assert types(events) == ["GATE_PERSON_OUT"] and events[0].payload["student_id"] == "stu-a"

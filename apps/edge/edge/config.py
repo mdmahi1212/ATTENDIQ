@@ -80,6 +80,11 @@ class ExitYaml(BaseModel):
     """
 
     enabled: bool = False
+    # line = OUT when a face crosses the exit line toward the door (camera also counts the class).
+    # presence = the camera only looks at the way out: every recognised face seen presence_min_s is OUT
+    #            (do not also count the class with it - seated students would be marked as leaving).
+    mode: str = "line"
+    presence_min_s: float = 0.6
     process_every_nth: int = 2
     # Line in normalised coords of the ROTATED inside frame, drawn where people walk to the door.
     # out_side = +1: crossing to the side where side() > 0 (below a left-to-right line, LEFT of a top-to-bottom
@@ -92,7 +97,8 @@ class ExitYaml(BaseModel):
 
     def to_gate_config(self, gate: GateYaml) -> GateConfig:
         # GateConfig.in_side names the ROOM side; for an exit-only camera the room is opposite the door side.
-        return GateConfig(line_a=self.line_a, line_b=self.line_b, in_side=-self.out_side, entry_mode="line",
+        return GateConfig(line_a=self.line_a, line_b=self.line_b, in_side=-self.out_side, entry_mode=self.mode,
+                          presence_min_s=self.presence_min_s,
                           count_in=False, min_travel_px=self.min_travel_px, min_face_px=self.min_face_px,
                           min_det_score=gate.min_det_score,
                           thresholds=Thresholds(accept=gate.accept, margin=gate.margin, min_votes=gate.min_votes),

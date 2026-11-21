@@ -284,10 +284,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # ------------------------------------------------------------ inside camera (occupancy)
     inside_cam: Camera | None = None
-    if cfg.inside.enabled and env.inside_camera_source and not args.no_inside and not args.video:
+    if (cfg.inside.enabled or exit_gate) and env.inside_camera_source and not args.no_inside and not args.video:
         inside_cam = Camera("inside", env.inside_camera_source, on_camera)
         inside_cam.start()
-        threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
+        if cfg.inside.enabled:  # people counting (off when the inside camera only watches the way out)
+            threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
         if exit_gate:
             threading.Thread(target=exit_loop, args=(inside_cam, exit_gate), daemon=True, name="exit").start()
 

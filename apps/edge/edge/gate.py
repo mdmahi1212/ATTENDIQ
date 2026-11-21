@@ -108,9 +108,10 @@ class GatePipeline:
                     tr.direction = d
                     self._on_cross(tr)
             seen_long = tr.last_seen - tr.first_seen >= self.cfg.presence_min_s
-            if self.cfg.entry_mode == "presence" and self.cfg.count_in and tr.direction is None and seen_long:
+            if self.cfg.entry_mode == "presence" and tr.direction is None and seen_long:
                 if len(tr.embeddings) >= self.cfg.thresholds.min_votes:
-                    tr.direction = "in"
+                    # Entry camera: any face seen long enough walked IN. Exit-only camera: it walked OUT.
+                    tr.direction = "in" if self.cfg.count_in else "out"
                     self._on_cross(tr)
             if tr.direction == "in" and not tr.decided and len(tr.embeddings) >= self.cfg.thresholds.min_votes + 1:
                 self._decide(tr)  # enough crops: decide early (lower latency)

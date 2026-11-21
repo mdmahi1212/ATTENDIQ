@@ -101,6 +101,12 @@ def main(argv: list[str] | None = None) -> int:
         return datetime.now(UTC) + timedelta(seconds=api.clock_offset)
 
     gallery = Gallery()
+    liveview = None
+    if cfg.liveview.enabled:
+        from edge.liveview import LiveView
+
+        liveview = LiveView(cfg.liveview.host, cfg.liveview.port, fps=cfg.liveview.fps)
+        liveview.serve()
     gate = GatePipeline(gate_cfg, gallery, device_id, emit, feedback, clock=server_now)
     # Exit recognition on the inside camera: same gallery and the same "who is inside" memory as the gate.
     exit_gate: GatePipeline | None = None
@@ -204,7 +210,9 @@ def main(argv: list[str] | None = None) -> int:
                                   cfg.inside.conf, cfg.inside.device)
         counter = OccupancyCounter(cfg.inside.window, cfg.inside.stable_count_seconds)
         session_seen = None
-        next_pub = 0.0
+        next_pub = next_count = 0.0
+        sample = None
+        period = min(cfg.inside.interval_s, liveview.period) if liveview else cfg.inside.interval_s
         log.info("inside camera ready (%s), roi %s, %s on %s", env.inside_camera_source, cfg.inside.roi,
                  Path(env.yolo_weights).name, "GPU" if yolo.device != "cpu" else "CPU")
         while not stop.is_set():
@@ -217,8 +225,14 @@ def main(argv: list[str] | None = None) -> int:
                 frame = rotate_frame(frame, cfg.inside.rotate)
                 boxes = yolo(frame)
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
-                sample = counter.add(len(kept), t)
-                inside_stats.update(raw=sample.raw, smoothed=sample.smoothed, stable=sample.stable)
+                if t >= next_count or sample is None:
+                    next_count = t + cfg.inside.interval_s
+                    sample = counter.add(len(kept), t)
+                    inside_stats.update(raw=sample.raw, smoothed=sample.smoothed, stable=sample.stable)
+                if liveview:
+                    from edge.liveview import draw_people
+
+                    liveview.update("inside", draw_people(frame, boxes, kept, len(kept), Path(env.yolo_weights).stem))
                 if args.debug:
                     import cv2
 
@@ -229,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
                     emit(Envelope(event_type=EventType.OCCUPANCY_UPDATED, source_device_id=device_id, session_id=gate.session_id,
                                   observed_at=server_now(), model_version=Path(env.yolo_weights).stem,
                                   payload={"raw": sample.raw, "smoothed": sample.smoothed, "stable": sample.stable}))
-            stop.wait(max(0.1, cfg.inside.interval_s - (time.monotonic() - t)))
+            stop.wait(max(0.05, period - (time.monotonic() - t)))
 
     inside_stats: dict[str, Any] = {}
 
@@ -246,7 +260,13 @@ def main(argv: list[str] | None = None) -> int:
             if k % max(1, cfg.exit.process_every_nth):
                 continue
             frame = rotate_frame(frame, cfg.inside.rotate)
-            pipeline.process(detect(frame), frame.shape[1], frame.shape[0], time.monotonic())
+            faces = detect(frame)
+            pipeline.process(faces, frame.shape[1], frame.shape[0], time.monotonic())
+            if liveview and liveview.due("exit"):
+                from edge.liveview import draw_faces
+
+                img = draw_faces(frame, faces, gallery, pipeline.memory, pipeline.cfg.thresholds, "way-out camera")
+                liveview.update("exit", img)
 
     # ------------------------------------------------------------ heartbeat + session poll
     def background() -> None:
@@ -313,6 +333,10 @@ def main(argv: list[str] | None = None) -> int:
             frame = rotate_frame(frame, rotation)
             faces = detect(frame)
             gate.process(faces, frame.shape[1], frame.shape[0], time.monotonic())
+            if liveview and liveview.due("gate"):
+                from edge.liveview import draw_faces
+
+                liveview.update("gate", draw_faces(frame, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera"))
     except KeyboardInterrupt:
         pass
     finally:

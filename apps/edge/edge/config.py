@@ -107,8 +107,18 @@ class ExitYaml(BaseModel):
                           model_version=f"buffalo_l / thr-{gate.accept} / exit")
 
 
+class LiveViewYaml(BaseModel):
+    """Live labelled camera view for demos (local web page, frames in RAM only)."""
+
+    enabled: bool = False
+    host: str = "127.0.0.1"  # local only; do not expose students' faces on the network
+    port: int = 8090
+    fps: float = 10.0
+
+
 class EdgeYaml(BaseModel):
     room_code: str | None = None
+    liveview: LiveViewYaml = LiveViewYaml()
     gate: GateYaml = GateYaml()
     inside: InsideYaml = InsideYaml()
     exit: ExitYaml = ExitYaml()

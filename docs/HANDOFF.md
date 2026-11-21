@@ -27,5 +27,8 @@ Keep this short. Update it after every step. Details live in PROGRESS.md / CLAUD
 (update as you go)
 - DONE (uncommitted): lib/dashboard.ts (+7 unit tests, 121 pass), app/sessions/[id]/dashboard/page.tsx, link
   "Live dashboard" on the class page. Lint + typecheck clean.
-- NOW: browser check on session 95d46ca6-af15-46fc-b9be-7b8723c5b06f (2-camera test: Mahi present, Fahim left),
+- DONE: dashboard committed 2fa206f (browser-checked). Was: browser check on session 95d46ca6-af15-46fc-b9be-7b8723c5b06f (2-camera test: Mahi present, Fahim left),
   then commit, then build the edge live labelled view (http://localhost:8090).
+- Live view WIP (committed, NOT run yet): edge/liveview.py + wiring in __main__.py + config `liveview:`.
+  NEXT: set `liveview: {enabled: true}` in apps/edge/config.yaml, restart edge, start a class, open http://127.0.0.1:8090,
+  check boxes/labels; add unit test for face_label; pytest; update PROGRESS; push when user says.

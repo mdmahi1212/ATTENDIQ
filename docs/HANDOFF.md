@@ -42,3 +42,5 @@ Live view (edge) still not run — do after UI.
 Progress:
 - step1+2 done: theme/logo/icons/auth page/shell (sidebar, mobile tabs+More sheet, transitions)
 - step3-5 done: admin/professor/student dashboards + components/dash.tsx + lib/stats.ts (4 tests). NEXT: browser check prof + mobile, then full lint/unit/build/e2e, fix, commit
+- step6-7 done: logo gradient-id bug fixed; lint ✓ tsc ✓ unit 125 ✓ build ✓ e2e 11/11 ✓; phone layout checked (tabs, More sheet, no overflow). Committed, NOT pushed.
+- LEFT: run edge live view (config liveview.enabled true) + test; push when user says.

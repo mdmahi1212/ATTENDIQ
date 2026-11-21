@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 
 /** AttendIQ mark: scan-frame corners (the camera seeing a face) around a check (attendance confirmed); dot = sensor. */
 export function LogoMark({ size = 32, className }: { size?: number; className?: string }) {
-  const id = "aiq-g";
+  // Unique per size: a gradient defined inside a hidden (display:none) copy of the logo would not render elsewhere.
+  const id = `aiq-g-${size}`;
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" className={className} aria-hidden="true">
       <defs>

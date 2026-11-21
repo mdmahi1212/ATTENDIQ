@@ -41,3 +41,4 @@ mobile top bar + bottom tabs + More sheet, page transition) · 3 admin dashboard
 Live view (edge) still not run — do after UI.
 Progress:
 - step1+2 done: theme/logo/icons/auth page/shell (sidebar, mobile tabs+More sheet, transitions)
+- step3-5 done: admin/professor/student dashboards + components/dash.tsx + lib/stats.ts (4 tests). NEXT: browser check prof + mobile, then full lint/unit/build/e2e, fix, commit

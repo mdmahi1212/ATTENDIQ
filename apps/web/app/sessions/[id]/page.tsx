@@ -84,6 +84,9 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
             {session.is_simulation && <SimBadge />}
             <StateBadge state={session.state} />
             {live && <LiveRefresh sessionId={id} />}
+            <Link href={`/sessions/${id}/dashboard`} className="text-sm underline underline-offset-4">
+              Live dashboard
+            </Link>
           </span>
         }
       />

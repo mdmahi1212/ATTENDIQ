@@ -63,3 +63,5 @@ desktop.ini
 .idea/
 .vscode/*
 !.vscode/extensions.json
+*.db-shm
+*.db-wal

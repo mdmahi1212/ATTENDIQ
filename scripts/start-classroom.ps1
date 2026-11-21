@@ -7,6 +7,7 @@
   powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1
   ... -MqttPort 1884          # if the default Mosquitto Windows service already holds 1883
   ... -NoFaceApi              # face-api already running (or not needed)
+  ... -FaceApiPort 8010        # if another program already listens on 8000
   ... -Video apps\edge\samples\walk.mp4   # replay a recording instead of the live gate camera
   ... -Presence               # entry_mode=presence (phone sees only people walking IN)
 
@@ -16,6 +17,7 @@
 param(
   [int]$MqttPort = 1883,
   [switch]$NoFaceApi,
+  [int]$FaceApiPort = 8000,
   [string]$Video = "",
   [switch]$Presence
 )
@@ -52,7 +54,7 @@ function Start-Part([string]$title, [string]$dir, [string]$command) {
 Start-Part "mosquitto" $repo "& '$mosq' -c '$conf'"
 Start-Sleep -Seconds 2
 if (-not $NoFaceApi) {
-  Start-Part "face-api" $repo "powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1"
+  Start-Part "face-api" $repo "powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1 -Port $FaceApiPort"
 }
 Start-Part "ingest" (Join-Path $repo "apps\ingest") ".\.venv\Scripts\python.exe -m ingest"
 $edgeArgs = ""

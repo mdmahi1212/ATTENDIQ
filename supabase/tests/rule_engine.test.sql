@@ -240,7 +240,9 @@ select public.run_count_checks(tests.sid(3), tests.t(3, 30));
 insert into tap(line) select is((select count(*)::int from public.verification_requests where session_id = tests.sid(3)), 2,
   'unstable count never opens a mismatch request');
 
--- ============================================================ E: left early via recheck
+-- ============================================================ E: end-of-class count alert (professor only) + manual recheck
+-- Rule change 2026-11-22: at T_end-5 the count check only ALERTS THE PROFESSOR; nobody is sent a recheck
+-- automatically. The professor starts one from the live page; non-verifiers then become left_early.
 select tests.session(4);
 select tests.apply(jsonb_build_array(
   tests.rec(tests.sid(4), tests.s(1), tests.t(4, 1)),
@@ -248,15 +250,27 @@ select tests.apply(jsonb_build_array(
   tests.rec(tests.sid(4), tests.s(3), tests.t(4, 3)),
   tests.ev('OCCUPANCY_UPDATED', tests.sid(4), tests.t(4, 64.5), '{"raw":2,"smoothed":2,"stable":true}')));
 select public.run_count_checks(tests.sid(4), tests.t(4, 65));
-create temp table req_e as select id from public.verification_requests where session_id = tests.sid(4) and kind = 'recheck';
-insert into tap(line) select is((select count(*)::int from req_e), 1, 'C < V - tolerance at T_end-10 opens recheck');
-insert into tap(line) select is((select state::text from public.class_sessions where id = tests.sid(4)), 'recheck', 'session state -> recheck');
+insert into tap(line) select is((select recheck_checked_at from public.class_sessions where id = tests.sid(4)), null,
+  'T_end-10 is before the end-of-class check window (T_end-5)');
+select tests.apply(jsonb_build_array(
+  tests.ev('OCCUPANCY_UPDATED', tests.sid(4), tests.t(4, 69.5), '{"raw":3,"smoothed":3,"stable":true}')));  -- 2 students + the professor (staff_count 1)
+select public.run_count_checks(tests.sid(4), tests.t(4, 70));
+insert into tap(line) select is((select count(*)::int from public.verification_requests where session_id = tests.sid(4)), 0,
+  'count < present at T_end-5 opens NO automatic recheck');
 insert into tap(line) select ok(exists (select 1 from public.notifications where user_id = tests.prof() and type = 'count_alert'
-  and data->>'session_id' = tests.sid(4)::text), 'professor alerted about the recheck');
+  and data->>'session_id' = tests.sid(4)::text and (data->>'counted')::int = 2 and (data->>'verified')::int = 3),
+  'professor alerted: 2 in the room, 3 marked present');
+insert into tap(line) select is((select count(*)::int from public.notifications where type = 'recheck_now'
+  and data->>'session_id' = tests.sid(4)::text), 0, 'students are not notified by the count check');
+-- The professor presses "Start recheck" on the live page.
+select public.open_verification_request(tests.sid(4), 'recheck', tests.prof(), tests.t(4, 70.5));
+create temp table req_e as select id from public.verification_requests where session_id = tests.sid(4) and kind = 'recheck';
+insert into tap(line) select is((select count(*)::int from req_e), 1, 'professor-started recheck opened');
+insert into tap(line) select is((select state::text from public.class_sessions where id = tests.sid(4)), 'recheck', 'session state -> recheck');
 insert into tap(line) select is((select count(*)::int from public.notifications where type = 'recheck_now'
   and data->>'request_id' = (select id::text from req_e)), 3, 'recheck_now sent to the 3 present students');
-select public.apply_self_verification(tests.attempt((select id from req_e), tests.s(1), tests.t(4, 66), true));
-insert into tap(line) select is(public.close_verification_request((select id from req_e), tests.t(4, 69)), 2,
+select public.apply_self_verification(tests.attempt((select id from req_e), tests.s(1), tests.t(4, 71), true));
+insert into tap(line) select is(public.close_verification_request((select id from req_e), tests.t(4, 74.5)), 2,
   'closing the recheck marks 2 non-verifiers');
 insert into tap(line) select is(tests.st(tests.sid(4), tests.s(1)), 'present', 'recheck passer stays present');
 insert into tap(line) select is(tests.st(tests.sid(4), tests.s(2)), 'left_early', 'recheck non-verifier -> left_early');
@@ -264,6 +278,31 @@ insert into tap(line) select ok('recheck_failed' = any((tests.att(tests.sid(4), 
 insert into tap(line) select is(tests.st(tests.sid(4), tests.s(4)), 'pending', 'student never sent the recheck is untouched');
 insert into tap(line) select ok(exists (select 1 from public.audit_log where entity = 'attendance'
   and entity_id = tests.sid(4) || ':' || tests.s(2) and reason = 'recheck not passed'), 'left_early change audited with reason');
+
+-- ============================================================ K: exit camera - left and never came back -> absent
+select tests.session(12);
+select tests.apply(jsonb_build_array(
+  tests.rec(tests.sid(12), tests.s(1), tests.t(12, 1)),
+  tests.rec(tests.sid(12), tests.s(2), tests.t(12, 2)),
+  tests.rec(tests.sid(12), tests.s(3), tests.t(12, 3)),
+  tests.ev('GATE_PERSON_OUT', tests.sid(12), tests.t(12, 20), jsonb_build_object('track_id', 7, 'student_id', tests.s(1))),
+  tests.ev('GATE_PERSON_OUT', tests.sid(12), tests.t(12, 30), jsonb_build_object('track_id', 8, 'student_id', tests.s(2))),
+  tests.rec(tests.sid(12), tests.s(2), tests.t(12, 35)),
+  tests.ev('OCCUPANCY_UPDATED', tests.sid(12), tests.t(12, 69.5), '{"raw":4,"smoothed":4,"stable":true}')));  -- 3 students + the professor
+select public.run_count_checks(tests.sid(12), tests.t(12, 70));
+insert into tap(line) select is((select count(*)::int from public.notifications where user_id = tests.prof() and type = 'count_alert'
+  and data->>'session_id' = tests.sid(12)::text), 0, 'count equals present at T_end-5 -> no professor alert');
+create temp table fin_k as select public.finalize_session(tests.sid(12), tests.t(12, 75)) as r;
+insert into tap(line) select is(tests.st(tests.sid(12), tests.s(1)), 'absent', 'went OUT at T0+20 and never came back -> absent');
+insert into tap(line) select ok('left_no_return' = any((tests.att(tests.sid(12), tests.s(1))).flags), 'flagged left_no_return');
+insert into tap(line) select is(tests.st(tests.sid(12), tests.s(2)), 'present', 'went OUT and came back through the door -> stays present');
+insert into tap(line) select ok('reentry' = any((tests.att(tests.sid(12), tests.s(2))).flags), 'come-back flagged reentry');
+insert into tap(line) select is(tests.st(tests.sid(12), tests.s(3)), 'present', 'never left -> present');
+insert into tap(line) select is(((select r from fin_k)->>'left_no_return')::int, 1, 'finalize reports 1 left_no_return');
+insert into tap(line) select ok(exists (select 1 from public.audit_log where entity = 'attendance'
+  and entity_id = tests.sid(12) || ':' || tests.s(1) and reason = 'left without returning'), 'absent change audited with reason');
+insert into tap(line) select ok(exists (select 1 from public.notifications where user_id = tests.s(1) and type = 'marked_absent'
+  and data->>'session_id' = tests.sid(12)::text), 'student told they were marked absent');
 
 -- ============================================================ F: gate camera offline -> pending, not absent
 select tests.session(5);

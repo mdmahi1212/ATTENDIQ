@@ -7,7 +7,8 @@ A university attendance system for an IoT course, mapped to the Cisco 7-layer Io
 - Gate camera (phone #1 via IP Webcam) → face recognition on the edge laptop → students marked present/late.
 - Inside camera (laptop webcam or phone #2) → person count.
 - Count > verified → push "verify now" to unmarked students → they verify on their phone with face + liveness + room QR (+ GPS).
-- T_end − 10 min: count < verified → professor alert → recheck → non-verifiers become `left_early` (counted absent by default policy).
+- Exit camera (inside camera beside the door, looking into the room): a recognised face crossing the exit line toward the door = `GATE_PERSON_OUT` for that student. At finalize, a present/late student whose last door event was OUT (no later re-entry, self-verify, recheck or manual mark) becomes **absent** (flag `left_no_return`).
+- T_end − 5 min: if the room count ≠ students marked present → **professor alert only** (no automatic student notifications). The professor may press **Start recheck** on the live page → non-verifiers become `left_early` (counted absent by default policy). (User decision 2026-11-22; replaces the spec's automatic recheck at T_end − 10.)
 - Admin / Professor / Student portals, appeals, reports, audit log.
 
 The full spec is `docs/ARCHITECTURE.md`. It is the source of truth for behaviour, rules, schema, events and APIs.

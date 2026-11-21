@@ -24,7 +24,7 @@ const GROUPS: { title: string; fields: { key: NumKey; label: string; step?: stri
       { key: "first_mismatch_check_min", label: "First mismatch check (min)" },
       { key: "mismatch_interval_min", label: "Check every (min)" },
       { key: "verify_window_min", label: "Verify window (min)" },
-      { key: "recheck_before_end_min", label: "Recheck before end (min)" },
+      { key: "recheck_before_end_min", label: "Count check before end (min)" },
       { key: "recheck_window_min", label: "Recheck window (min)" },
       { key: "count_tolerance", label: "Count tolerance (people)" },
       { key: "stable_count_seconds", label: "Stable count after (s)" },

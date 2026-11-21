@@ -71,10 +71,39 @@ class InsideYaml(BaseModel):
     roi: list[tuple[float, float]] = [(0.0, 0.3), (1.0, 0.3), (1.0, 1.0), (0.0, 1.0)]
 
 
+class ExitYaml(BaseModel):
+    """Exit recognition on the INSIDE camera (placed beside the door, looking into the room).
+
+    A recognised face that crosses the exit line toward the door is a GATE_PERSON_OUT for that student;
+    the database marks students whose last door event was OUT as absent when the class is finalized.
+    Uses the inside camera's frames and rotation and the gate's thresholds.
+    """
+
+    enabled: bool = False
+    process_every_nth: int = 2
+    # Line in normalised coords of the ROTATED inside frame, drawn where people walk to the door.
+    # out_side = +1: crossing to the side where side() > 0 (below a left-to-right line, LEFT of a top-to-bottom
+    # line) means OUT; -1 the opposite.
+    line_a: tuple[float, float] = (0.2, 0.0)
+    line_b: tuple[float, float] = (0.2, 1.0)
+    out_side: int = 1
+    min_travel_px: float = 25
+    min_face_px: int = 50
+
+    def to_gate_config(self, gate: GateYaml) -> GateConfig:
+        # GateConfig.in_side names the ROOM side; for an exit-only camera the room is opposite the door side.
+        return GateConfig(line_a=self.line_a, line_b=self.line_b, in_side=-self.out_side, entry_mode="line",
+                          count_in=False, min_travel_px=self.min_travel_px, min_face_px=self.min_face_px,
+                          min_det_score=gate.min_det_score,
+                          thresholds=Thresholds(accept=gate.accept, margin=gate.margin, min_votes=gate.min_votes),
+                          model_version=f"buffalo_l / thr-{gate.accept} / exit")
+
+
 class EdgeYaml(BaseModel):
     room_code: str | None = None
     gate: GateYaml = GateYaml()
     inside: InsideYaml = InsideYaml()
+    exit: ExitYaml = ExitYaml()
     heartbeat_seconds: float = 15
     gallery_refresh_seconds: float = 60
     control_poll_seconds: float = 15

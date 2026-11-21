@@ -31,6 +31,19 @@ inside:
   rotate: 0
   roi: [[0.0, 0.3], [1.0, 0.3], [1.0, 1.0], [0.0, 1.0]]   # seat area; feet outside it are ignored
 
+# Exit recognition on the INSIDE camera (beside the door, looking into the room). A recognised face that crosses
+# the exit line toward the door = GATE_PERSON_OUT; students whose last door event is OUT are marked absent at the
+# end of class. Line coords are in the ROTATED inside frame; out_side = +1: crossing to the LEFT of a top-to-bottom
+# line (or BELOW a left-to-right line) is OUT.
+exit:
+  enabled: false
+  process_every_nth: 2
+  line_a: [0.2, 0.0]
+  line_b: [0.2, 1.0]
+  out_side: 1                 # door on the left of the picture
+  min_travel_px: 25
+  min_face_px: 50
+
 heartbeat_seconds: 15
 gallery_refresh_seconds: 60   # re-fetch the session gallery (students who enroll during class)
 control_poll_seconds: 15      # fallback HTTP poll of the current session if no MQTT control arrives

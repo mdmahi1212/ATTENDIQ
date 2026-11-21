@@ -101,6 +101,11 @@ def main(argv: list[str] | None = None) -> int:
 
     gallery = Gallery()
     gate = GatePipeline(gate_cfg, gallery, device_id, emit, feedback, clock=server_now)
+    # Exit recognition on the inside camera: same gallery and the same "who is inside" memory as the gate.
+    exit_gate: GatePipeline | None = None
+    if cfg.exit.enabled:
+        exit_gate = GatePipeline(cfg.exit.to_gate_config(cfg.gate), gallery, device_id, emit, None, clock=server_now,
+                                 memory=gate.memory)
     session_lock = threading.Lock()
 
     def set_session(session_id: str | None, reason: str) -> None:
@@ -120,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
                 if current:
                     log.info("session stop (%s)", reason)
                 gate.stop()
+                if exit_gate:
+                    exit_gate.stop()
                 return
             try:
                 data = api.gallery(session_id)
@@ -127,6 +134,9 @@ def main(argv: list[str] | None = None) -> int:
                 log.error("gallery fetch failed: %s", e)
                 return
             gate.start(uuid.UUID(session_id), data)
+            if exit_gate:
+                exit_gate.session_id = gate.session_id  # gallery + memory are shared and were just reset by gate.start
+                exit_gate.tracker.clear()
             log.info("session %s (%s): gallery %d students", session_id, reason, len(gallery))
 
     if client:
@@ -177,6 +187,12 @@ def main(argv: list[str] | None = None) -> int:
     from edge.detector import InsightFaceDetector
 
     detector = InsightFaceDetector(resolve(env.insightface_home), cfg.gate.det_size)
+    detector_lock = threading.Lock()  # the gate loop and the exit loop share one InsightFace model
+
+    def detect(frame: Any) -> list[Any]:
+        with detector_lock:
+            return detector(frame)
+
     log.info("detector ready; room %s; source %s; mode %s; rotate %s", room, source, gate_cfg.entry_mode,
              args.rotate if args.rotate is not None else cfg.gate.rotate)
 
@@ -215,6 +231,21 @@ def main(argv: list[str] | None = None) -> int:
 
     inside_stats: dict[str, Any] = {}
 
+    def exit_loop(cam: Camera, pipeline: GatePipeline) -> None:
+        log.info("exit recognition ready on the inside camera; line %s -> %s, out_side %s",
+                 cfg.exit.line_a, cfg.exit.line_b, cfg.exit.out_side)
+        last, k = -1, 0
+        while not stop.is_set():
+            seq, frame, _ = cam.latest()
+            if frame is None or seq == last or pipeline.session_id is None:
+                stop.wait(0.02)
+                continue
+            last, k = seq, k + 1
+            if k % max(1, cfg.exit.process_every_nth):
+                continue
+            frame = rotate_frame(frame, cfg.inside.rotate)
+            pipeline.process(detect(frame), frame.shape[1], frame.shape[0], time.monotonic())
+
     # ------------------------------------------------------------ heartbeat + session poll
     def background() -> None:
         next_hb, next_poll, next_gallery = 0.0, 0.0, time.monotonic() + cfg.gallery_refresh_seconds
@@ -245,7 +276,8 @@ def main(argv: list[str] | None = None) -> int:
                     "cpu": psutil.cpu_percent(), "fps": {"gate": round(camera.fps, 1)},
                     "frame_age_s": {"gate": None if age is None else round(age, 1)},
                     "outbox": outbox.pending_count(), "gallery": len(gallery),
-                    "session_id": str(gate.session_id) if gate.session_id else None, "stats": gate.stats}))
+                    "session_id": str(gate.session_id) if gate.session_id else None, "stats": gate.stats,
+                    "exit_stats": exit_gate.stats if exit_gate else None}))
             stop.wait(0.5)
 
     threading.Thread(target=background, daemon=True, name="background").start()
@@ -256,6 +288,8 @@ def main(argv: list[str] | None = None) -> int:
         inside_cam = Camera("inside", env.inside_camera_source, on_camera)
         inside_cam.start()
         threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
+        if exit_gate:
+            threading.Thread(target=exit_loop, args=(inside_cam, exit_gate), daemon=True, name="exit").start()
 
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
@@ -274,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
             if n % max(1, cfg.gate.process_every_nth):
                 continue
             frame = rotate_frame(frame, rotation)
-            faces = detector(frame)
+            faces = detect(frame)
             gate.process(faces, frame.shape[1], frame.shape[0], time.monotonic())
     except KeyboardInterrupt:
         pass

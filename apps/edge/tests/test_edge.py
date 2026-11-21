@@ -283,3 +283,49 @@ def test_gallery_reload_keeps_who_is_already_marked() -> None:
     walk(pipe, lambda i: near(c, 0.7, 600 + i), [150, 200, 250, 300, 350], t0=20)  # newly enrolled C recognised
     rec = [e.payload["student_id"] for e in events if e.event_type.value == "GATE_ENTRY_RECOGNISED"]
     assert rec == ["stu-a", "stu-c"]
+
+
+# ---------------------------------------------------------------- exit camera (inside, beside the door)
+def walk_x(pipe: GatePipeline, emb_fn, xs: list[float], y: float = 240, size: float = 120, t0: float = 0.0) -> None:  # noqa: ANN001
+    for i, x in enumerate(xs):
+        box = (x - size / 2, y - size / 2, x + size / 2, y + size / 2)
+        pipe.process([FaceDet(box, 0.85, emb_fn(i))], 640, 480, t0 + i * 0.1)
+    for k in range(12):
+        pipe.process([], 640, 480, t0 + (len(xs) + k) * 0.1)
+
+
+def make_exit_pipe(memory: SessionMemory | None = None) -> tuple[GatePipeline, list[Envelope]]:
+    from edge.config import ExitYaml, GateYaml
+
+    events: list[Envelope] = []
+    # Door on the LEFT of the picture: a vertical line at x = 0.3; crossing to its left (side() > 0) is OUT.
+    cfg = ExitYaml(enabled=True, line_a=(0.3, 0.0), line_b=(0.3, 1.0), out_side=1).to_gate_config(GateYaml())
+    pipe = GatePipeline(cfg, Gallery(), DEV, events.append, None,
+                        clock=lambda: datetime(2026, 11, 22, 2, 0, tzinfo=UTC), memory=memory)
+    pipe.start(uuid.uuid4(), GALLERY)
+    return pipe, events
+
+
+def test_exit_camera_reports_the_student_walking_to_the_door() -> None:
+    pipe, events = make_exit_pipe()
+    walk_x(pipe, lambda i: near(B, 0.7, 100 + i), [400, 340, 280, 220, 160, 100])  # right -> left, toward the door
+    assert types(events) == ["GATE_PERSON_OUT"] and events[0].payload["student_id"] == "stu-b"
+    assert events[0].model_version.endswith("/ exit")
+
+
+def test_exit_camera_ignores_people_coming_in_and_people_sitting() -> None:
+    pipe, events = make_exit_pipe()
+    walk_x(pipe, lambda i: near(A, 0.7, 100 + i), [100, 160, 220, 280, 340, 400])  # entering (seen from behind)
+    walk_x(pipe, lambda i: near(B, 0.7, 200 + i), [450] * 15, t0=10)  # seated in the room, never crosses
+    assert events == []
+
+
+def test_exit_then_entry_at_the_door_is_a_reported_reentry() -> None:
+    entry, entry_events, _ = make_pipe()
+    exit_pipe, exit_events = make_exit_pipe(memory=entry.memory)
+    exit_pipe.session_id = entry.session_id
+    walk(entry, lambda i: near(A, 0.7, 100 + i), [150, 200, 250, 300, 350])  # comes in
+    walk_x(exit_pipe, lambda i: near(A, 0.7, 200 + i), [400, 340, 280, 220, 160, 100], t0=10)  # leaves via the exit camera
+    walk(entry, lambda i: near(A, 0.7, 300 + i), [150, 200, 250, 300, 350], t0=20)  # comes back
+    assert types(exit_events) == ["GATE_PERSON_OUT"]
+    assert types(entry_events).count("GATE_ENTRY_RECOGNISED") == 2

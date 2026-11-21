@@ -42,6 +42,9 @@ class GateConfig:
     # >= presence_min_s counts as IN (for a phone pointed only at people walking IN).
     entry_mode: str = "line"
     presence_min_s: float = 0.6
+    # False = exit-only camera (inside, beside the door, looking into the room): crossings toward the room
+    # are ignored because this camera sees entering people from behind; only OUT crossings are reported.
+    count_in: bool = True
     min_travel_px: float = 25.0
     min_face_px: int = 60
     min_det_score: float = 0.6
@@ -52,11 +55,14 @@ class GateConfig:
 class GatePipeline:
     def __init__(self, cfg: GateConfig, gallery: Gallery, device_id: uuid.UUID,
                  emit: Callable[[Envelope], None], feedback: Callable[[str], None] | None = None,
-                 clock: Callable[[], datetime] = lambda: datetime.now(UTC)) -> None:
+                 clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+                 memory: SessionMemory | None = None) -> None:
         self.cfg, self.gallery, self.device_id = cfg, gallery, device_id
         self._emit, self._feedback, self._clock = emit, feedback, clock
         self.tracker = IouTracker(keep_embeddings=5)
-        self.memory = SessionMemory()
+        # Shared between the entry and the exit pipeline: an OUT seen by the exit camera makes the next
+        # entry at the door a reported re-entry.
+        self.memory = memory if memory is not None else SessionMemory()
         self.session_id: uuid.UUID | None = None
         self.simulation = False
         self.stats = {"frames": 0, "faces": 0, "in": 0, "out": 0, "recognised": 0, "unknown": 0}
@@ -96,11 +102,13 @@ class GatePipeline:
         for tr in touched:
             if tr.direction is None and self.cfg.entry_mode == "line":
                 d = crossing(tr.history, a, b, self.cfg.in_side, self.cfg.min_travel_px)
-                if d:
+                if d == "in" and not self.cfg.count_in:
+                    tr.direction = "ignored"
+                elif d:
                     tr.direction = d
                     self._on_cross(tr)
             seen_long = tr.last_seen - tr.first_seen >= self.cfg.presence_min_s
-            if self.cfg.entry_mode == "presence" and tr.direction is None and seen_long:
+            if self.cfg.entry_mode == "presence" and self.cfg.count_in and tr.direction is None and seen_long:
                 if len(tr.embeddings) >= self.cfg.thresholds.min_votes:
                     tr.direction = "in"
                     self._on_cross(tr)

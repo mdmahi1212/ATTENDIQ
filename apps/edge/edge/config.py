@@ -29,7 +29,7 @@ class Env(BaseSettings):
     mqtt_ca_file: str = ""
     gate_camera_source: str = "0"
     inside_camera_source: str = ""  # "" = no inside camera on this node
-    yolo_weights: str = "yolov8n.pt"
+    yolo_weights: str = "yolo11x.pt"
     outbox_path: str = "./data/outbox.db"
     insightface_home: str = "./models"
     log_level: str = "INFO"

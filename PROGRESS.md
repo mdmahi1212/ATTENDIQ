@@ -16,6 +16,9 @@ Last updated: 2026-11-19
 | 7 Recheck, finalize, appeals, reports | DONE (commit ea450a3) | see Gate 7 below |
 | 8 ESP32, hardening, docs | BUILT — live demo partly done + Wi-Fi cut passed 2026-11-22; remaining demo steps open | see Gate 8 below |
 
+### Counting model -> YOLO11x (2026-11-22, user decision)
+Benchmarked on this laptop's CPU (Ultralytics 8.4.215, torch CPU) with real pictures: InsightFace sample (6 people), 2 people from the iPhone, an empty room. All three models counted every picture correctly (6/6, 2/2, 0/0): yolov8n ~35 ms, yolo11n ~33 ms, **yolo11x ~400 ms** per frame. Counting runs once every 3 s, so yolo11x (largest, most accurate YOLO11; better on far / partly hidden people and fewer false persons) fits. Weights `yolo11x.pt` copied from the user's local `C:\dev\bowlersense\models` into `apps/edge/models/` (gitignored); `YOLO_WEIGHTS=./models/yolo11x.pt`. `tests/test_real_yolo.py` now runs on both models (36 edge tests pass). NOT VERIFIED live: CPU load with both cameras during a class (phone 1 was off when the edge restarted). The laptop has an NVIDIA GPU (CUDA works in bowlersense); the edge still uses CPU torch - switching to a CUDA build would make yolo11x much faster but is a large install (not done).
+
 ## Gate 8 status (2026-11-19, demo update 2026-11-22) — Definition of Done
 
 | # | Check | Result |

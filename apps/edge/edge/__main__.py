@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import psutil
@@ -225,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
                 if t >= next_pub:
                     next_pub = t + cfg.inside.publish_s
                     emit(Envelope(event_type=EventType.OCCUPANCY_UPDATED, source_device_id=device_id, session_id=gate.session_id,
-                                  observed_at=server_now(), model_version="yolov8n",
+                                  observed_at=server_now(), model_version=Path(env.yolo_weights).stem,
                                   payload={"raw": sample.raw, "smoothed": sample.smoothed, "stable": sample.stable}))
             stop.wait(max(0.1, cfg.inside.interval_s - (time.monotonic() - t)))
 

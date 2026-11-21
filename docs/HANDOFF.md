@@ -32,3 +32,12 @@ Keep this short. Update it after every step. Details live in PROGRESS.md / CLAUD
 - Live view WIP (committed, NOT run yet): edge/liveview.py + wiring in __main__.py + config `liveview:`.
   NEXT: set `liveview: {enabled: true}` in apps/edge/config.yaml, restart edge, start a class, open http://127.0.0.1:8090,
   check boxes/labels; add unit test for face_label; pytest; update PROGRESS; push when user says.
+
+## UI REDESIGN (started 2026-11-22, user request) — commit after each step
+Plan: 1 tokens+logo+icons (globals.css, components/logo.tsx, public/icons) · 2 shell (app-shell, nav-links, lib/nav.ts icons+groups,
+mobile top bar + bottom tabs + More sheet, page transition) · 3 admin dashboard (KPIs, 14-day chart, activity, devices) ·
+4 professor dashboard (today, section rates, at-risk) · 5 student dashboard (rings, next class, recent) · 6 login page ·
+7 lint/types/unit/build/e2e + browser desktop+mobile · commit. Keep existing data-testids and nav labels (e2e uses them).
+Live view (edge) still not run — do after UI.
+Progress:
+- step1+2 done: theme/logo/icons/auth page/shell (sidebar, mobile tabs+More sheet, transitions)

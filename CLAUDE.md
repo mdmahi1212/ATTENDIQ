@@ -59,7 +59,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 - SQL tests: `scripts\test-db.ps1` (needs `SUPABASE_DB_URL`) — files in `supabase/tests/*.test.sql`, each rolled back
 - Python apps (`apps/face-api`, `apps/edge`, `apps/ingest`, `apps/simulator`): `.\.venv\Scripts\activate; ruff check .; pytest`
 - Gate 7 live check: `cd apps/simulator; $env:SIM_LIVE='1'; .\.venv\Scripts\python.exe -m pytest tests\test_gate7_live.py`
-- Start everything on the laptop: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 [-MqttPort 1884]`
+- Start everything on the laptop: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 [-MqttPort 1884] [-FaceApiPort 8010]` (use -FaceApiPort when another program holds 8000)
 - Face API + tunnel only: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1`
 - Simulator: `cd apps/simulator; .\.venv\Scripts\python.exe -m simulator run [--direct] [--finalize] [--script scripts/mismatch.yaml --hold-minutes 3]`
 - Device key (+ MQTT user): `powershell -ExecutionPolicy Bypass -File scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply] [-MqttUser <name>]`

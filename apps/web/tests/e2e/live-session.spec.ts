@@ -58,6 +58,53 @@ test("professor live page: counters, roster, and a gate event appears without re
   }
 });
 
+test("Start recheck on the live page opens a recheck request for present students", async ({ page }) => {
+  test.setTimeout(90_000);
+  const admin = adminClient();
+  const { data: sessionId, error } = await admin.rpc("create_adhoc_session", {
+    p_room: ROOM,
+    p_section: SECTION,
+    p_starts_at: new Date(Date.now() - 120_000).toISOString(),
+    p_minutes: 30,
+    p_simulation: true,
+  });
+  expect(error).toBeNull();
+  try {
+    // One present student so the recheck has a target.
+    await admin.rpc("apply_edge_events", {
+      p_device: SIM_DEVICE,
+      p_events: [
+        {
+          event_id: crypto.randomUUID(),
+          event_type: "GATE_ENTRY_RECOGNISED",
+          source_device_id: SIM_DEVICE,
+          session_id: sessionId,
+          observed_at: new Date().toISOString(),
+          payload: { track_id: 1, student_id: sim(3), score: 0.7, margin: 0.3 },
+          simulation: true,
+        },
+      ],
+    });
+    await signIn(page, E2E.adminEmail(), E2E.adminPassword(), /\/admin$/);
+    await page.goto(`/sessions/${sessionId}`);
+    await expect(page.getByTestId("live-indicator")).toHaveAttribute("data-live", "true", { timeout: 20_000 });
+
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => {
+      dialogs.push(d.message());
+      void d.accept();
+    });
+    await page.getByRole("button", { name: "Start recheck" }).click();
+    await expect(page.getByText(/Recheck started/)).toBeVisible({ timeout: 20_000 });
+    expect(dialogs).toHaveLength(1);
+
+    const { data: reqs } = await admin.from("verification_requests").select("kind, status").eq("session_id", sessionId as string);
+    expect(reqs).toEqual([{ kind: "recheck", status: "open" }]);
+  } finally {
+    await admin.from("class_sessions").update({ state: "cancelled", cancelled_reason: "e2e cleanup" }).eq("id", sessionId as string);
+  }
+});
+
 test("verify and QR APIs refuse anonymous callers", async ({ request }) => {
   const id = "00000000-0000-4000-8000-000000000000";
   expect((await request.post(`/api/verify/${id}`)).status()).toBe(401);

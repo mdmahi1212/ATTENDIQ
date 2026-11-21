@@ -21,7 +21,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 | Auth / DB / Realtime / Storage | Supabase (Postgres + pgvector + PostGIS + pg_cron + pg_net), RLS on every table |
 | Supabase client in Next.js | `@supabase/ssr` (NOT the deprecated auth-helpers) |
 | Face embeddings | `apps/face-api`: Python 3.11 FastAPI + InsightFace `buffalo_l` (CPU, onnxruntime). **Stateless compute only**: images in → embeddings + quality out. It has NO database credentials. |
-| Edge AI | `apps/edge`: Python 3.11, OpenCV, InsightFace (gate), Ultralytics **YOLO11x** (inside count; user decision 2026-11-22, was YOLOv8n — kept as the light fallback) |
+| Edge AI | `apps/edge`: Python 3.11, OpenCV, InsightFace (gate), Ultralytics **YOLO11x** (inside count; user decision 2026-11-22, was YOLOv8n — kept as the light fallback); runs on the NVIDIA GPU when torch has CUDA (`apps/edge/requirements-gpu.txt`), else CPU |
 | IoT messaging | MQTT (Mosquitto on the laptop). Edge publishes → `apps/ingest` subscribes → POSTs batches to Next.js `/api/edge/v1/events` with a device key |
 | Push | Web Push (VAPID) with the `web-push` npm package inside a Next.js **Node runtime** route. Triggered by a Supabase database webhook on `notifications` insert. In-app inbox via Realtime is the fallback. |
 | Rule engine | Postgres SQL functions, driven by `pg_cron` every minute (`session_tick()`). Vercel cron is NOT used. |

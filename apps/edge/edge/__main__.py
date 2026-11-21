@@ -201,11 +201,12 @@ def main(argv: list[str] | None = None) -> int:
         from edge.occupancy import OccupancyCounter, YoloPersonDetector, annotate, in_roi
 
         yolo = YoloPersonDetector(str(resolve(env.yolo_weights)) if resolve(env.yolo_weights).exists() else env.yolo_weights,
-                                  cfg.inside.conf)
+                                  cfg.inside.conf, cfg.inside.device)
         counter = OccupancyCounter(cfg.inside.window, cfg.inside.stable_count_seconds)
         session_seen = None
         next_pub = 0.0
-        log.info("inside camera ready (%s), roi %s", env.inside_camera_source, cfg.inside.roi)
+        log.info("inside camera ready (%s), roi %s, %s on %s", env.inside_camera_source, cfg.inside.roi,
+                 Path(env.yolo_weights).name, "GPU" if yolo.device != "cpu" else "CPU")
         while not stop.is_set():
             t = time.monotonic()
             if gate.session_id != session_seen:

@@ -64,6 +64,7 @@ class InsideYaml(BaseModel):
     interval_s: float = 3.0          # run YOLO every N seconds
     publish_s: float = 10.0          # OCCUPANCY_UPDATED every N seconds
     conf: float = 0.4
+    device: str = "auto"           # auto = NVIDIA GPU if torch has CUDA, else CPU; or "cpu" / "0"
     window: int = 10                 # median over the last N samples
     stable_count_seconds: float = 60.0
     rotate: int = 0

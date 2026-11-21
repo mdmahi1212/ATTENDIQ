@@ -1,0 +1,7 @@
+# Optional: NVIDIA GPU build of PyTorch for the edge (YOLO11x people counting ~27 ms instead of ~360 ms per frame).
+# Install AFTER requirements.txt, with the edge stopped (Windows locks the files in use):
+#   .\.venv\Scripts\python.exe -m pip install -r requirements-gpu.txt --index-url https://download.pytorch.org/whl/cu130 --extra-index-url https://pypi.org/simple
+# Needs an NVIDIA driver that supports CUDA 13.0+ (`nvidia-smi`). Verified 2026-11-22 on an RTX 3060 Laptop GPU
+# (driver 596.36, CUDA 13.2). config.yaml inside.device: auto picks the GPU when torch has CUDA, else the CPU.
+torch==2.14.1+cu130
+torchvision==0.29.1+cu130

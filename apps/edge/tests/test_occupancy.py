@@ -44,3 +44,12 @@ def test_reset() -> None:
     c.add(5, 0)
     c.reset()
     assert c.add(1, 1).smoothed == 1
+
+
+def test_device_auto_uses_the_gpu_only_when_torch_has_cuda() -> None:
+    import torch
+
+    from edge.occupancy import resolve_device
+
+    assert resolve_device("cpu") == "cpu" and resolve_device("0") == "0"
+    assert resolve_device("auto") == ("0" if torch.cuda.is_available() else "cpu")

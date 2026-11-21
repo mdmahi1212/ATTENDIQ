@@ -71,15 +71,25 @@ class PersonDetector(Protocol):
     def __call__(self, frame: np.ndarray) -> list[Box]: ...
 
 
+def resolve_device(device: str = "auto") -> str:
+    """'auto' = first CUDA GPU when torch has CUDA, else CPU. Ultralytics does not pick the GPU by itself here."""
+    if device != "auto":
+        return device
+    import torch
+
+    return "0" if torch.cuda.is_available() else "cpu"
+
+
 class YoloPersonDetector:
-    def __init__(self, weights: str = "yolov8n.pt", conf: float = 0.4) -> None:
+    def __init__(self, weights: str = "yolo11x.pt", conf: float = 0.4, device: str = "auto") -> None:
         from ultralytics import YOLO
 
         self._model = YOLO(weights)
         self.conf = conf
+        self.device = resolve_device(device)
 
     def __call__(self, frame: np.ndarray) -> list[Box]:
-        res = self._model.predict(frame, classes=[0], conf=self.conf, verbose=False)[0]
+        res = self._model.predict(frame, classes=[0], conf=self.conf, verbose=False, device=self.device)[0]
         return [tuple(float(v) for v in b) for b in res.boxes.xyxy.tolist()]  # type: ignore[misc]
 
 

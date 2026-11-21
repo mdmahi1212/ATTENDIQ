@@ -14,15 +14,15 @@ Last updated: 2026-11-19
 | 5 Edge + MQTT + ingest + simulator | LIVE TEST PASSED — only the recorded-video check is open | see Gate 5 below |
 | 6 Occupancy + live dashboard + self-verify | DONE (commit c53a737) | see Gate 6 below |
 | 7 Recheck, finalize, appeals, reports | DONE (commit ea450a3) | see Gate 7 below |
-| 8 ESP32, hardening, docs | BUILT — gate needs the user's live demo + Wi-Fi cut | see Gate 8 below |
+| 8 ESP32, hardening, docs | BUILT — live demo partly done 2026-11-22; Wi-Fi cut + remaining demo steps open | see Gate 8 below |
 
-## Gate 8 status (2026-11-19) — Definition of Done
+## Gate 8 status (2026-11-19, demo update 2026-11-22) — Definition of Done
 
 | # | Check | Result |
 |---|---|---|
 | 1 | Fresh clone + README reach a running system | ⏳ README quick start written (`README.md`), every step was exercised in this project, but **not replayed on a second, clean laptop** |
 | 2 | All automated tests pass; lint + typecheck + build clean | ✅ SQL: rule_engine 95, manual_mark 9, appeals 19, **rls_matrix 13 (62 probes)**, **privacy_ops 9** · Vitest 114 · Playwright 10/10 (dev) and 10/10 against the **production build with CSP** (0 console errors on admin pages incl. the map) · pytest face-api 20, edge 31, ingest 7, simulator 11 (+ Gate 7 live), pycommon 5 · ruff, eslint, tsc, next build |
-| 3 | Live 10-step demo works with the user's phones (user confirms each step) | ⏳ NOT DONE — script in `docs/DEMO_SCRIPT.md`; steps 2, 4, 5, 7 (after the fix), 10 were each already shown live in Gates 4-7 |
+| 3 | Live 10-step demo works with the user's phones (user confirms each step) | 🟡 PARTLY DONE live on 2026-11-22 (production, user's Android phone, IOT401-01 ad-hoc session `98e2d2f0`): **gate** - walk-in recognised 1 s after the session opened (score 0.74, 5/5 votes) -> present; **recheck** - push delivered and opened within 6 s, QR + face 0.89 + server live 0.997 -> verified in 64 s, repeated (face 0.88, live 0.9998); **finalize** - session ended, 30 SIM students `needs_review` (not absent) because the inside camera was not healthy (fail-safe working); **appeal** - student filed `excused` (on the Nov 18 test session), professor approved with a note -> attendance `excused`, audit row by the professor with the reason, 'Appeal approved' push to the student. Not done in this run: simulator during the live session, count mismatch -> self-verify (step 5), late walk-in (6), photo attack (7; printed-photo result from Gate 6 stands), recheck left early (8), Wi-Fi cut (9), ESP32 LED (no board). Note: `Start recheck` from the live page did not create a request in this run (cause not found - likely the confirm popup not accepted); the request was opened with the same RPC as the admin user. |
 | 4 | Cutting the Wi-Fi for 1 minute loses no events | ✅ simulated: ingest pointed at an unreachable API for 60 s while a 115-event class was published (0 events reached the DB), then the ingest process was **killed** and restarted: the broker redelivered all unacked QoS 1 messages -> **112/112 unique events stored** (3 duplicates ignored), statuses correct, backlog drained in 6.5 s. Edge outbox replay after a broker outage was verified in Phase 5. ⏳ The literal Wi-Fi unplug with the user is still to do |
 | 5 | `docs/CISCO_LAYERS.md` maps every component to a layer | ✅ |
 

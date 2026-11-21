@@ -39,6 +39,7 @@ class GateYaml(BaseModel):
     process_every_nth: int = 2
     rotate: int = 0  # clockwise degrees (0/90/180/270) applied to gate frames before detection
     det_size: int = 640
+    device: str = "auto"  # face detection + recognition: auto = NVIDIA GPU if it works, else CPU; or "cpu"
     min_face_px: int = 60
     min_det_score: float = 0.6
     line_a: tuple[float, float] = (0.0, 0.55)

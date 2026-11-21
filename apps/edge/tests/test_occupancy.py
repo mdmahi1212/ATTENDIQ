@@ -53,3 +53,14 @@ def test_device_auto_uses_the_gpu_only_when_torch_has_cuda() -> None:
 
     assert resolve_device("cpu") == "cpu" and resolve_device("0") == "0"
     assert resolve_device("auto") == ("0" if torch.cuda.is_available() else "cpu")
+
+
+def test_face_detector_device_choice() -> None:
+    import onnxruntime as ort
+    import torch
+
+    from edge.detector import CPU, GPU, face_providers
+
+    assert face_providers("cpu") == CPU
+    gpu_ok = torch.cuda.is_available() and "CUDAExecutionProvider" in ort.get_available_providers()
+    assert face_providers("auto") == (GPU if gpu_ok else CPU)

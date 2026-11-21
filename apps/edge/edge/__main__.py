@@ -187,15 +187,15 @@ def main(argv: list[str] | None = None) -> int:
 
     from edge.detector import InsightFaceDetector
 
-    detector = InsightFaceDetector(resolve(env.insightface_home), cfg.gate.det_size)
+    detector = InsightFaceDetector(resolve(env.insightface_home), cfg.gate.det_size, device=cfg.gate.device)
     detector_lock = threading.Lock()  # the gate loop and the exit loop share one InsightFace model
 
     def detect(frame: Any) -> list[Any]:
         with detector_lock:
             return detector(frame)
 
-    log.info("detector ready; room %s; source %s; mode %s; rotate %s", room, source, gate_cfg.entry_mode,
-             args.rotate if args.rotate is not None else cfg.gate.rotate)
+    log.info("detector ready on %s; room %s; source %s; mode %s; rotate %s", detector.device, room, source,
+             gate_cfg.entry_mode, args.rotate if args.rotate is not None else cfg.gate.rotate)
 
     def occupancy_loop(cam: Camera) -> None:
         from edge.occupancy import OccupancyCounter, YoloPersonDetector, annotate, in_roi

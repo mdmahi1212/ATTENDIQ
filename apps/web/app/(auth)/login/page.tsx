@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AuthCard } from "@/components/auth-card";
 import { LoginForm } from "./login-form";
 
-export const metadata = { title: "Sign in · Smart Attendance" };
+export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;

@@ -8,12 +8,13 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Smart Attendance",
+  title: { default: "AttendIQ", template: "%s · AttendIQ" },
   description: "AIoT university attendance: gate face recognition, occupancy count and phone self-verify.",
-  applicationName: "Smart Attendance",
-  appleWebApp: { capable: true, title: "Attendance", statusBarStyle: "default" },
+  applicationName: "AttendIQ",
+  appleWebApp: { capable: true, title: "AttendIQ", statusBarStyle: "default" },
   icons: {
     icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
@@ -22,9 +23,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1d4ed8",
+  themeColor: "#4F46E5",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -89,14 +89,25 @@ test("Start recheck on the live page opens a recheck request for present student
     await page.goto(`/sessions/${sessionId}`);
     await expect(page.getByTestId("live-indicator")).toHaveAttribute("data-live", "true", { timeout: 20_000 });
 
+    // No native popup any more: the first click asks on the page; Cancel backs out without sending anything.
     const dialogs: string[] = [];
     page.on("dialog", (d) => {
       dialogs.push(d.message());
-      void d.accept();
+      void d.dismiss();
     });
     await page.getByRole("button", { name: "Start recheck" }).click();
+    const group = page.getByRole("group", { name: "Confirm Start recheck" });
+    await expect(group).toContainText("Ask every present/late student");
+    await group.getByRole("button", { name: "Cancel" }).click();
+    await expect(group).toBeHidden();
+    const { data: none } = await admin.from("verification_requests").select("id").eq("session_id", sessionId as string);
+    expect(none).toEqual([]);
+
+    await page.getByRole("button", { name: "Start recheck" }).click();
+    await page.getByRole("button", { name: "Yes, start recheck" }).click();
     await expect(page.getByText(/Recheck started/)).toBeVisible({ timeout: 20_000 });
-    expect(dialogs).toHaveLength(1);
+    await expect(page.getByRole("button", { name: "Start recheck" })).toBeVisible(); // disarmed after the submit
+    expect(dialogs).toEqual([]);
 
     const { data: reqs } = await admin.from("verification_requests").select("kind, status").eq("session_id", sessionId as string);
     expect(reqs).toEqual([{ kind: "recheck", status: "open" }]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode, type SelectHTMLAttributes } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -145,6 +145,10 @@ export function RowAction({
   );
 }
 
+/**
+ * Submit button with an optional two-step, on-page confirmation (no `window.confirm`: native popups are easy to
+ * miss on a projector and some embedded browsers block them silently, so the action never ran).
+ */
 function ConfirmSubmit({
   label,
   variant,
@@ -155,17 +159,44 @@ function ConfirmSubmit({
   confirm?: string;
 }) {
   const { pending } = useFormStatus();
+  const [armed, setArmed] = useState(false);
+  // Disarm once a submission finishes (derived state during render, the React-recommended pattern).
+  const [wasPending, setWasPending] = useState(pending);
+  if (pending !== wasPending) {
+    setWasPending(pending);
+    if (!pending) setArmed(false);
+  }
+
+  if (!confirm) {
+    return (
+      <Button type="submit" size="xs" variant={variant} disabled={pending}>
+        {pending ? "…" : label}
+      </Button>
+    );
+  }
+  if (!armed) {
+    return (
+      <Button type="button" size="xs" variant={variant} onClick={() => setArmed(true)}>
+        {label}
+      </Button>
+    );
+  }
   return (
-    <Button
-      type="submit"
-      size="xs"
-      variant={variant}
-      disabled={pending}
-      onClick={(e) => {
-        if (confirm && !window.confirm(confirm)) e.preventDefault();
+    <span
+      role="group"
+      aria-label={`Confirm ${label}`}
+      className="inline-flex flex-wrap items-center gap-1.5"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !pending) setArmed(false);
       }}
     >
-      {pending ? "…" : label}
-    </Button>
+      <span className="text-xs text-muted-foreground">{confirm}</span>
+      <Button type="button" size="xs" variant="ghost" disabled={pending} onClick={() => setArmed(false)}>
+        Cancel
+      </Button>
+      <Button type="submit" size="xs" variant={variant} disabled={pending} autoFocus>
+        {pending ? "…" : `Yes, ${label.toLowerCase()}`}
+      </Button>
+    </span>
   );
 }

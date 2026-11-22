@@ -170,6 +170,10 @@ class FakeCap:
     def get(self, _p: int) -> float:
         return 0.0
 
+    def set(self, prop: int, value: float) -> bool:
+        self.sets = [*getattr(self, "sets", []), (prop, value)]
+        return True
+
 
 def test_backoff_doubles_and_caps() -> None:
     b = Backoff(1, 8)
@@ -199,6 +203,33 @@ def test_camera_reports_offline_then_online_and_reconnects() -> None:
     assert statuses[:3] == [False, True, False]
     seq, frame, _ = cam.latest()
     assert seq == 3 and frame is not None
+
+
+def test_video_file_starts_at_the_offset_and_ends(tmp_path) -> None:  # noqa: ANN001
+    video = tmp_path / "exit.mp4"
+    video.write_bytes(b"")  # only has to exist: the fake opener plays it
+    cap = FakeCap(5)
+    cam = Camera("inside", str(video), opener=lambda _s: cap, sleep=lambda _s: None, skip_s=12.5)
+    cam.start()
+    for _ in range(200):
+        if cam.ended:
+            break
+        import time
+
+        time.sleep(0.01)
+    cam.stop()
+    assert cam.ended and cam.latest()[0] == 5
+    assert cap.sets == [(0, 12500.0)]  # CAP_PROP_POS_MSEC
+
+
+def test_no_seek_without_offset(tmp_path) -> None:  # noqa: ANN001
+    video = tmp_path / "walk.mp4"
+    video.write_bytes(b"")
+    cap = FakeCap(2)
+    cam = Camera("gate", str(video), opener=lambda _s: cap, sleep=lambda _s: None)
+    cam.start()
+    cam._thread.join(2)  # type: ignore[union-attr]
+    assert cam.ended and not hasattr(cap, "sets")
 
 
 # ---------------------------------------------------------------- gate pipeline end to end

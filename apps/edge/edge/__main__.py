@@ -1,7 +1,10 @@
-"""python -m edge [--video samples/walk.mp4] [--direct] [--presence]
+"""python -m edge [--video samples/walk.mp4 [--exit-video samples/exit.mp4]] [--direct] [--presence]
 
 Default: reads the gate camera from .env, publishes events over MQTT (SQLite outbox first).
---video FILE  play a recorded video instead of the live camera (real-time speed), exit at the end.
+--video FILE       play a recorded video instead of the live gate camera (real-time speed), exit at the end.
+                   Playback waits until a session is live in the room, so no frame is wasted.
+--exit-video FILE  play a recording of the way-out (inside) camera at the same time (scenario replays).
+--video-offset S / --exit-offset S  skip the first S seconds of a file, to line the two recordings up.
 --direct      POST events straight to the web API instead of MQTT (no broker needed; still uses the outbox).
 """
 
@@ -35,12 +38,17 @@ log = logging.getLogger("edge")
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="edge")
     ap.add_argument("--video", help="video file instead of the live gate camera")
+    ap.add_argument("--exit-video", help="video file instead of the live inside / way-out camera (needs --video)")
+    ap.add_argument("--video-offset", type=float, default=0.0, help="skip the first S seconds of --video")
+    ap.add_argument("--exit-offset", type=float, default=0.0, help="skip the first S seconds of --exit-video")
     ap.add_argument("--direct", action="store_true", help="POST events to the API instead of MQTT")
     ap.add_argument("--presence", action="store_true", help="entry_mode=presence (overrides config.yaml)")
     ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], help="rotate gate frames clockwise (overrides config.yaml)")
     ap.add_argument("--no-inside", action="store_true", help="do not run the inside (occupancy) camera")
     ap.add_argument("--debug", action="store_true", help="write the annotated inside frame to data/inside-debug.jpg")
     args = ap.parse_args(argv)
+    if args.exit_video and not args.video:
+        ap.error("--exit-video needs --video (both recordings are replayed together)")
 
     env = Env()  # type: ignore[call-arg]
     cfg = load_yaml(env.edge_config_path)
@@ -188,8 +196,9 @@ def main(argv: list[str] | None = None) -> int:
                       payload={"camera": name, "failures": failures}))
 
     source = args.video or env.gate_camera_source
-    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera)
-    camera.start()
+    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera, skip_s=args.video_offset)
+    if not args.video:
+        camera.start()  # recordings start in the main loop once a session is live
 
     from edge.detector import InsightFaceDetector
 
@@ -213,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         next_pub = next_count = 0.0
         sample = None
         period = min(cfg.inside.interval_s, liveview.period) if liveview else cfg.inside.interval_s
-        log.info("inside camera ready (%s), roi %s, %s on %s", env.inside_camera_source, cfg.inside.roi,
+        log.info("inside camera ready (%s), roi %s, %s on %s", cam.source, cfg.inside.roi,
                  Path(env.yolo_weights).name, "GPU" if yolo.device != "cpu" else "CPU")
         while not stop.is_set():
             t = time.monotonic()
@@ -306,9 +315,14 @@ def main(argv: list[str] | None = None) -> int:
 
     # ------------------------------------------------------------ inside camera (occupancy)
     inside_cam: Camera | None = None
-    if (cfg.inside.enabled or exit_gate) and env.inside_camera_source and not args.no_inside and not args.video:
-        inside_cam = Camera("inside", env.inside_camera_source, on_camera)
-        inside_cam.start()
+    inside_source = str(resolve(args.exit_video)) if args.exit_video else env.inside_camera_source
+    use_inside = (args.exit_video or not args.video) and not args.no_inside
+    if args.exit_video and not (cfg.inside.enabled or exit_gate):
+        log.warning("--exit-video given but config.yaml has exit and inside disabled: the recording is ignored")
+    if (cfg.inside.enabled or exit_gate) and inside_source and use_inside:
+        inside_cam = Camera("inside", inside_source, on_camera, skip_s=args.exit_offset)
+        if not args.exit_video:
+            inside_cam.start()
         if cfg.inside.enabled:  # people counting (off when the inside camera only watches the way out)
             threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
         if exit_gate:
@@ -317,9 +331,18 @@ def main(argv: list[str] | None = None) -> int:
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
     last_seq, n = -1, 0
+    playing = not args.video
+    if args.video:
+        log.info("waiting for a live session in %s before playing the recording(s)", room)
     try:
         while not stop.is_set():
-            if args.video and camera.ended:
+            if not playing and gate.session_id is not None:
+                playing = True  # start both recordings together so their timelines stay in step
+                camera.start()
+                if inside_cam and args.exit_video:
+                    inside_cam.start()
+                log.info("playing %s%s", args.video, f" + {args.exit_video}" if inside_cam and args.exit_video else "")
+            if args.video and playing and camera.ended and (not inside_cam or not args.exit_video or inside_cam.ended):
                 time.sleep(2)  # let the last decisions publish
                 break
             seq, frame, _ = camera.latest()

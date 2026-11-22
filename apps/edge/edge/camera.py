@@ -23,6 +23,7 @@ class Capture(Protocol):
     def read(self) -> tuple[bool, Any]: ...
     def release(self) -> None: ...
     def get(self, prop: int) -> float: ...
+    def set(self, prop: int, value: float) -> bool: ...
 
 
 def open_capture(source: str) -> Capture:
@@ -53,8 +54,9 @@ class Backoff:
 class Camera:
     def __init__(self, name: str, source: str, on_status: Callable[[str, bool, int], None] | None = None,
                  opener: Callable[[str], Capture] = open_capture, loop_file: bool = False,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep, skip_s: float = 0.0) -> None:
         self.name, self.source = name, source
+        self.skip_s = skip_s  # video files only: start this many seconds into the file (lines up two recordings)
         self._open, self._on_status, self._sleep = opener, on_status, sleep
         self._loop_file = loop_file
         self._lock = threading.Lock()
@@ -107,6 +109,8 @@ class Camera:
                 continue
             backoff.reset()
             self.failures = 0
+            if file_mode and self.skip_s > 0:
+                cap.set(0, self.skip_s * 1000.0)  # CAP_PROP_POS_MSEC
             fps_src = cap.get(5) if file_mode else 0  # CAP_PROP_FPS
             frame_dt = 1.0 / fps_src if fps_src and fps_src > 0 else 0.0
             n, t_fps = 0, time.monotonic()

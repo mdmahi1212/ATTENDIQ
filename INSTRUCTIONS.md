@@ -146,4 +146,4 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 
 ## Done
 - 2026-11-23: Admin → Demo page (5 / 10 / 15 min / full class) and the video demo runner are live.
-- 2026-11-23: one-click demo: `demoSTART-DEMO.bat` + `demoideos` folder.
+- 2026-11-23: one-click demo: `demo\START-DEMO.bat` + `demo\videos` folder.

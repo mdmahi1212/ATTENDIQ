@@ -30,7 +30,7 @@ VIDEO_EXT = (".mp4", ".mov", ".m4v", ".avi", ".mkv")
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "section": "IOT401-01",
-    "staff": 1,  # people in phone 2's view who are not students (the professor); 0 if nobody plays the professor
+    "staff": 0,  # people in phone 2's view who are not students (a friend playing the professor); demo default: nobody
     "door_rotate": 0,  # clockwise degrees if phone 1's video looks sideways in the live view (90 / 180 / 270)
     "room_rotate": 0,
     # Exit line in phone 2's picture (0..1 from the left / top), drawn in amber in the live view.

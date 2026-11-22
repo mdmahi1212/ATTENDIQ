@@ -3,8 +3,8 @@
 # Class the demo runs as. Every enrolled student who is not in the videos ends absent.
 section: IOT401-01
 
-# People in phone 2's view who are not students (a friend playing the professor). 0 if nobody.
-staff: 1
+# People in phone 2's view who are not students (a friend playing the professor). 0 = nobody.
+staff: 0
 
 # If a video looks sideways in the live view (http://127.0.0.1:8090): 90, 180 or 270 (clockwise).
 door_rotate: 0

@@ -17,7 +17,7 @@ export default async function ProfessorHome() {
   const supabase = await createClient();
   const today = seoulToday();
   const from = new Date(new Date(`${today}T00:00:00Z`).getTime() - 29 * 86_400_000).toISOString().slice(0, 10);
-  const [{ data: sections }, { data: todayRows }, { data: att }, { count: openAppeals }] = await Promise.all([
+  const [{ data: sections }, { data: todayRows }, { data: att }, { count: openAppeals }, { data: toReview }] = await Promise.all([
     supabase
       .from("section_staff")
       .select("staff_role, sections(id, section_no, courses(code, title), semesters(name), rooms(code), enrollments(count), timetable_slots(weekday, start_time, end_time))")
@@ -37,6 +37,15 @@ export default async function ProfessorHome() {
       .eq("profiles.is_simulated", false)
       .limit(10000),
     supabase.from("appeals").select("*", { count: "exact", head: true }).eq("status", "open"),
+    // Records the rules flagged for the professor (RLS: only this professor's classes).
+    supabase
+      .from("attendance")
+      .select("session_id, note, flags, profiles!attendance_student_id_fkey!inner(full_name, is_simulated), class_sessions!inner(starts_at, session_date, is_simulation, section_id)")
+      .overlaps("flags", ["unconfirmed", "needs_review", "manual_check"])
+      .gte("class_sessions.session_date", from)
+      .eq("class_sessions.is_simulation", false)
+      .eq("profiles.is_simulated", false)
+      .limit(50),
   ]);
 
   const mySections = (sections ?? []).map((s) => s.sections).filter((s): s is NonNullable<typeof s> => Boolean(s));
@@ -125,6 +134,29 @@ export default async function ProfessorHome() {
               );
             })}
           </ul>
+        </Panel>
+
+        <Panel title="Needs your review" className="order-last lg:col-span-2" action={<span className="text-xs text-muted-foreground">last 30 days</span>}>
+          {(toReview ?? []).filter((r) => sectionIds.has(r.class_sessions!.section_id)).length === 0 ? (
+            <Empty>Nothing to review. The cameras settled every record.</Empty>
+          ) : (
+            <ul className="divide-y" data-testid="prof-review">
+              {(toReview ?? [])
+                .filter((r) => sectionIds.has(r.class_sessions!.section_id))
+                .sort((a, b) => b.class_sessions!.starts_at.localeCompare(a.class_sessions!.starts_at))
+                .slice(0, 8)
+                .map((r, i) => (
+                  <li key={`${r.session_id}-${i}`} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+                    <span className="w-24 shrink-0 text-xs tabular-nums text-muted-foreground">{fmtSeoul(r.class_sessions!.starts_at, "MM-dd HH:mm")}</span>
+                    <span className="font-medium">{r.profiles?.full_name}</span>
+                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                      {r.note ?? (r.flags.includes("manual_check") ? "asked for a manual check" : "needs review")}
+                    </span>
+                    <Link href={`/sessions/${r.session_id}`} className="text-xs text-primary">Review →</Link>
+                  </li>
+                ))}
+            </ul>
+          )}
         </Panel>
 
         <Panel title="Students at risk" action={<TriangleAlert className="size-4 text-amber-500" />}>

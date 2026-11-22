@@ -8,7 +8,7 @@ import { lookups } from "@/lib/lookups";
 import { createClient } from "@/lib/supabase/server";
 import { hhmm, weekdayLabel } from "@/lib/time";
 import { STAFF_ROLES } from "@/lib/validation";
-import { assignStaff, createSection, deleteSection, removeStaff, startTestSession } from "./actions";
+import { assignStaff, createSection, deleteSection, removeStaff } from "./actions";
 
 export default async function SectionsPage() {
   const supabase = await createClient();
@@ -49,20 +49,9 @@ export default async function SectionsPage() {
                     </span>
                   </span>
                   <span className="inline-flex gap-1">
-                    <RowAction
-                      action={startTestSession}
-                      fields={{ id: s.id, minutes: "30" }}
-                      label="Start 30-min test session"
-                      variant="outline"
-                      confirm="Start a real attendance session for this section now (30 min)? Enrolled students who are not seen will be marked absent at the end."
-                    />
-                    <RowAction
-                      action={startTestSession}
-                      fields={{ id: s.id, minutes: "45", started_minutes_ago: "12" }}
-                      label="Demo: class started 12 min ago"
-                      variant="outline"
-                      confirm="Start a real session whose start time is 12 minutes ago (walk-ins now count as late)?"
-                    />
+                    <Link href="/admin/demo" className="inline-flex h-7 items-center rounded-md border px-2 text-xs hover:bg-muted">
+                      Start a class…
+                    </Link>
                     <RowAction action={deleteSection} fields={{ id: s.id }} label="Delete" variant="destructive" confirm="Delete this section?" />
                   </span>
                 </CardTitle>

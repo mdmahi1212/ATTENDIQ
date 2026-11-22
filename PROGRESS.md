@@ -1,6 +1,6 @@
 # PROGRESS
 
-Last updated: 2026-11-19
+Last updated: 2026-11-23 (see docs/HANDOFF.md for the 2026-11-22..23 rounds)
 
 ## Phase status
 

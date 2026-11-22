@@ -45,10 +45,10 @@ export function ActionForm({
   );
 }
 
-export function SubmitButton({ children, variant, size }: { children: ReactNode } & Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
+export function SubmitButton({ children, variant, size, className }: { children: ReactNode; className?: string } & Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} variant={variant} size={size}>
+    <Button type="submit" disabled={pending} variant={variant} size={size} className={className}>
       {pending ? "Saving…" : children}
     </Button>
   );

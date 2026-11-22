@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { ActionForm, SelectField, SubmitButton, TextField } from "@/components/form";
 import type { ActionState } from "@/lib/action-state";
 
@@ -20,9 +21,16 @@ export function SimpleCreateForm({
   hidden?: Record<string, string>;
 }) {
   return (
-    <ActionForm action={action} className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border p-4">
+    <ActionForm action={action} className="aiq-enter mb-6 rounded-2xl border bg-card p-4 shadow-sm md:p-5">
       {(state) => (
         <>
+          <p className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <span className="grid size-6 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Plus className="size-3.5" />
+            </span>
+            {submit}
+          </p>
+          <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
           {hidden && Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           {fields.map((f) =>
             "options" in f ? (
@@ -35,7 +43,7 @@ export function SimpleCreateForm({
                 required={f.required}
                 defaultValue={f.defaultValue}
                 state={state}
-                className="min-w-44"
+                className="min-w-0"
               />
             ) : (
               <TextField
@@ -47,11 +55,12 @@ export function SimpleCreateForm({
                 defaultValue={f.defaultValue}
                 placeholder={f.placeholder}
                 state={state}
-                className="min-w-40"
+                className="min-w-0"
               />
             ),
           )}
-          <SubmitButton>{submit}</SubmitButton>
+          <SubmitButton className="w-full sm:w-auto">{submit}</SubmitButton>
+          </div>
         </>
       )}
     </ActionForm>

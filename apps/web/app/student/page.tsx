@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, Flame, MapPin, ScanFace, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarClock, Flame, MapPin, ScanFace, Smartphone, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app-shell";
 import { FaceBadge, StatusBadge } from "@/components/badges";
@@ -13,7 +13,7 @@ export default async function StudentHome() {
   const user = await requireRole("student");
   const supabase = await createClient();
   const today = seoulToday();
-  const [{ data: enrollments }, { data: face }, { data: records }] = await Promise.all([
+  const [{ data: enrollments }, { data: face }, { data: records }, { data: phone }] = await Promise.all([
     supabase
       .from("enrollments")
       .select("starts_on, ends_on, sections(id, section_no, courses(code, title), rooms(code), timetable_slots(weekday, start_time, end_time))")
@@ -26,6 +26,7 @@ export default async function StudentHome() {
       .eq("class_sessions.is_simulation", false)
       .neq("class_sessions.state", "cancelled")
       .limit(1000),
+    supabase.from("student_devices").select("label, registered_at").eq("student_id", user.id).maybeSingle(),
   ]);
   // Open verification windows addressed to me (RLS: targets see their own requests).
   const { data: openReqs } = await supabase
@@ -120,6 +121,17 @@ export default async function StudentHome() {
             </span>
             {!faceActive && <span className="text-xs font-medium text-primary">Enroll now →</span>}
           </Link>
+          <div className="col-span-2 flex items-center gap-3 rounded-2xl border bg-card p-4 text-sm" data-testid="student-phone">
+            <span className="grid size-10 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/15">
+              <Smartphone className="size-5" />
+            </span>
+            <span className="flex-1">
+              <span className="block font-medium">Verify phone</span>
+              <span className="text-xs text-muted-foreground">
+                {phone ? `${phone.label ?? "This phone"} · registered ${fmtSeoul(phone.registered_at, "MM-dd")}. Only this phone can verify.` : "Your first \"Verify now\" registers the phone you use. New phone? Ask the admin."}
+              </span>
+            </span>
+          </div>
         </section>
       </div>
 

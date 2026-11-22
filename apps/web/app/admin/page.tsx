@@ -1,4 +1,4 @@
-import { Activity, BookOpen, Cpu, GraduationCap, Layers, Radio, ScanFace, TrendingUp, TriangleAlert, Users } from "lucide-react";
+import { Activity, BookOpen, Cpu, GraduationCap, Layers, PlayCircle, Radio, ScanFace, TrendingUp, TriangleAlert, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app-shell";
 import { DayBars, Empty, LiveDot, Panel, Ring, StatCard } from "@/components/dash";
@@ -15,7 +15,8 @@ export default async function AdminDashboard() {
   const today = seoulToday();
   const from = new Date(new Date(`${today}T00:00:00Z`).getTime() - (DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
   const head = { count: "exact" as const, head: true };
-  const [students, professors, courses, sections, review, pending, appeals, sessions, att, audit, devices] = await Promise.all([
+  const weekAgo = new Date(new Date(`${today}T00:00:00Z`).getTime() - 6 * 86_400_000).toISOString().slice(0, 10);
+  const [students, professors, courses, sections, review, pending, appeals, sessions, att, audit, devices, toReview] = await Promise.all([
     supabase.from("profiles").select("*", head).eq("role", "student").eq("is_simulated", false),
     supabase.from("profiles").select("*", head).eq("role", "professor"),
     supabase.from("courses").select("*", head),
@@ -39,6 +40,13 @@ export default async function AdminDashboard() {
       .limit(10000),
     supabase.from("audit_log").select("id, at, action, entity, reason").order("at", { ascending: false }).limit(7),
     supabase.from("edge_devices").select("name, kind, last_seen").eq("is_active", true).order("name"),
+    // Attendance the rules could not settle alone this week: not seen in the room, or a camera had a problem.
+    supabase
+      .from("attendance")
+      .select("student_id, class_sessions!inner(session_date, is_simulation)", head)
+      .overlaps("flags", ["unconfirmed", "needs_review"])
+      .gte("class_sessions.session_date", weekAgo)
+      .eq("class_sessions.is_simulation", false),
   ]);
 
   const rows = (att.data ?? []).map((r) => ({ date: r.class_sessions!.session_date, status: r.status as Att }));
@@ -51,11 +59,26 @@ export default async function AdminDashboard() {
     { n: review.count ?? 0, text: "faces waiting for review", href: "/admin/faces" },
     { n: appeals.count ?? 0, text: "open appeals", href: "/admin/audit" },
     { n: pending.count ?? 0, text: "students without a face", href: "/admin/faces" },
+    { n: toReview.count ?? 0, text: "attendance records to review (7 days)", href: "/admin/reports" },
   ].filter((a) => a.n > 0);
 
   return (
     <>
       <PageHeader title="Dashboard" description="Your university's attendance at a glance." />
+
+      <nav className="aiq-stagger mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Quick actions">
+        {[
+          { href: "/admin/demo", label: "Start a class", icon: PlayCircle },
+          { href: "/admin/people", label: "Add people", icon: UserPlus },
+          { href: "/admin/faces", label: "Review faces", icon: ScanFace },
+          { href: "/operator", label: "Cameras & devices", icon: Cpu },
+        ].map((q) => (
+          <Link key={q.href} href={q.href} className="aiq-lift flex items-center gap-2 rounded-xl border bg-card px-3 py-2.5 text-sm font-medium">
+            <q.icon className="size-4 text-primary" />
+            {q.label}
+          </Link>
+        ))}
+      </nav>
 
       <div className="aiq-stagger grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <StatCard label="Attendance (7 days)" value={week.pct === null ? "—" : `${week.pct}%`} icon={TrendingUp} tone="emerald" hint={`${week.attended} of ${week.total} records`} href="/admin/reports" />

@@ -23,7 +23,7 @@ Accounts and passwords are NOT written here (this repo is public): use the ones 
 | Phone | Where | Points at | Hold it |
 |---|---|---|---|
 | **Phone 1** (door video) | **outside** the door, at head height, 1.5–2 m from the door | the faces of people walking **in** | **landscape**, still |
-| **Phone 2** (room video) | **inside** the room, beside the door | the seats **and** the door, so it sees everyone sitting and anyone walking out | **landscape**, still |
+| **Phone 2** (room video) | **inside**, in a **front corner** of the room | the students' faces (back row too) **and** the door | **landscape**, still |
 
 Good light on faces. No window behind the people (backlight hides faces). All 5 seats must be inside phone 2's picture.
 
@@ -123,6 +123,9 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
    - marked at the door but **never seen in the room** → "not seen in room" (professor reviews; status kept),
    - **self-verified** on the phone but not seen in the room within 10 min → same,
    - an **unknown face sitting in the room** → the professor gets "Unknown person in the room" (no picture stored).
+   - the **room camera marks students too**: someone the door missed is marked when the room camera recognises them;
+     "Verify now" goes only to students no camera could recognise. They verify with face + **tap your seat** on a
+     map of the room (no QR needed; the QR on the class page stays as a backup).
    - **one phone per student**: the first "Verify now" registers that phone; another phone is refused.
      New phone? Admin → People → **Reset phone** on that student.
 4. After a class: class page → **Class summary → Write summary** (who attended, left, needs review, at-risk).
@@ -167,5 +170,6 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 - Sync the Windows clock (Settings → Time → Sync now).
 
 ## Done
+- 2026-11-23: room camera marks attendance, back-row faces, two-camera exit, tap-your-seat verify, tidier admin, new dashboard panels.
 - 2026-11-23: Admin → Demo page (5 / 10 / 15 min / full class) and the video demo runner are live.
 - 2026-11-23: one-click demo: `demo\START-DEMO.bat` + `demo\videos` folder.

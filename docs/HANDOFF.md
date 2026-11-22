@@ -108,3 +108,9 @@ Progress:
   lib/class-facts.ts; class page 'Class summary -> Write summary' (ended classes). Claude claude-opus-5-5, effort low,
   fallbacks "default" (beta server-side-fallback-2026-07-01) when ANTHROPIC_API_KEY set; else template. Browser-checked
   template path on session 95d46ca6 (summary saved there). Claude path NOT run (no key). @anthropic-ai/sdk 1.12.0.
+- 2026-11-23 FINAL ROUND (all pushed): ROOM_SEEN marks pending students (method room; migrations 20261122200243/200320,
+  checked rolled back); edge tiles 2x2 on room camera, BoT-SORT buffer 300, ExitFusion two-camera exit, door leaving
+  (leaving_shrinks); verify 'tap your seat' (lib/verify/seat.ts, /api/verify/[id]/seats), QR backup; admin quick
+  actions + review count, professor 'Needs your review', student 'Verify phone'; SimpleCreateForm card; Sections test
+  buttons -> Admin -> Demo. Checks: web unit 143, e2e 11/11 (prod build), edge 69, face-api 20, ingest 7, sim 11,
+  pycommon 5, lint/ruff/tsc/build clean. NOT verified with real people (videos tomorrow).

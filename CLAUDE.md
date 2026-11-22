@@ -7,7 +7,9 @@ A university attendance system for an IoT course, mapped to the Cisco 7-layer Io
 - Gate camera (phone #1 via IP Webcam) → face recognition on the edge laptop → students marked present/late.
 - Inside camera (laptop webcam or phone #2) → person count.
 - Count > verified → push "verify now" to unmarked students → they verify on their phone with face + liveness + room QR (+ GPS).
-- Exit camera (inside camera beside the door, looking into the room): a recognised face crossing the exit line toward the door = `GATE_PERSON_OUT` for that student. At finalize, a present/late student whose last door event was OUT (no later re-entry, self-verify, recheck or manual mark) becomes **absent** (flag `left_no_return`).
+- Exit (room camera, phone 2): a student crossing the exit line toward the door = `GATE_PERSON_OUT` - by face, or by BODY (BoT-SORT + ReID body ids carry the identity of the face seen earlier in class; user decision 2026-11-23, accepted risk of swapped tracks), or two-camera (a named body lost near the door + the door camera sees someone walk away within 10 s). At finalize, a present/late student whose last door event was OUT (no later re-entry, self-verify, recheck, room sighting or manual mark) becomes **absent** (flag `left_no_return`).
+- Room camera recognition is attendance evidence (method `room`, user decision 2026-11-23): a student the door missed is marked when the room camera recognises them (arrival = last unrecognised door entry before). Marked at the door / self-verified but never seen in the room -> flag `unconfirmed` (professor review, status kept). Unknown face sitting in the room -> professor alert. Door faces get a passive anti-spoof check.
+- Self-verify room proof = tap your seat (the room camera must see a person there) OR the rotating room QR (backup); one registered phone per student (admin can reset).
 - T_end − 5 min: if the room count ≠ students marked present → **professor alert only** (no automatic student notifications). The professor may press **Start recheck** on the live page → non-verifiers become `left_early` (counted absent by default policy). (User decision 2026-11-22; replaces the spec's automatic recheck at T_end − 10.)
 - Admin / Professor / Student portals, appeals, reports, audit log.
 
@@ -27,7 +29,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 | Rule engine | Postgres SQL functions, driven by `pg_cron` every minute (`session_tick()`). Vercel cron is NOT used. |
 | Supabase Edge Functions (Deno) | Not needed. Never try to run InsightFace/ONNX in Deno. |
 | Liveness | MediaPipe Face Landmarker (`@mediapipe/tasks-vision`) in the browser: random blink / turn-left / turn-right challenge |
-| Room presence proof | Rotating QR: `HMAC_SHA256(qr_secret, session_id + ":" + floor(epoch_seconds/20))`, accept current + previous slot |
+| Room presence proof | Seat tap confirmed by the room camera, or the rotating QR: `HMAC_SHA256(qr_secret, session_id + ":" + floor(epoch_seconds/20))`, accept current + previous slot |
 
 ## Security rules
 - The Supabase **service-role key** exists ONLY in server-side Next.js code (route handlers, server actions) and never in the browser, the edge laptop, the face-api, or git.

@@ -97,7 +97,7 @@ For a brand-new Supabase project apply `supabase/migrations/*` + `supabase/seed.
    ```
    (`-MqttPort 1884` while the Mosquitto Windows service holds 1883.) The face-api script publishes its tunnel URL to
    the web app automatically.
-8. **Try it**: Admin → Sections → *Start 30-min test session*; open it from the dashboard; walk past phone #1; or run the
+8. **Try it**: Admin → Demo → *Full class* (or 5 / 10 / 15 min); open it from the dashboard; walk past phone #1; or run the
    simulator: `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run`. Full walkthrough: `docs/DEMO_SCRIPT.md`.
 9. **Reset before a demo**: `powershell -ExecutionPolicy Bypass -File scripts\reset-demo.ps1`.
 

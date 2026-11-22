@@ -38,4 +38,36 @@ export const demoSessionSchema = z.object({
   minutes: z.number().int().min(10).max(240).default(75),
 });
 
+/** Recorded-video presentation: the edge starts a REAL class for its room, replays the videos, then ends it. */
+export const replaySessionSchema = z.object({
+  /** "IOT401-01" (course code + section no). Default: the room's section with the most real students with an active face. */
+  section: z.string().regex(/^[A-Za-z0-9]{1,20}-[A-Za-z0-9]{1,10}$/).optional(),
+  /** Scheduled length; the edge ends it early when the videos finish (or waits for it with --full-class). DB minimum 10. */
+  minutes: z.number().int().min(10).max(60).default(10),
+  /** Compress the class rules into ~10 minutes (DEMO_POLICY) so every rule fires during a short recorded demo. */
+  demo_timing: z.boolean().default(false),
+  /** People counted by the room camera who are not students (professor). Real classes default to 1. */
+  staff_count: z.number().int().min(0).max(5).default(1),
+});
+
+/**
+ * Demo timing for one recorded-video class: the same rules as a real class, compressed so that present / late,
+ * the count check (push to unmarked students) and the professor's end-of-class alert all happen in ~10 minutes.
+ * Real (timetable) classes never use this.
+ */
+export const DEMO_POLICY = {
+  present_until_min: 2,
+  late_until_min: 5,
+  first_mismatch_check_min: 2,
+  mismatch_interval_min: 1,
+  verify_window_min: 3,
+  recheck_before_end_min: 2,
+  recheck_window_min: 2,
+} as const;
+
+/** Off unless EDGE_REPLAY_SESSIONS=true on the server: lets an edge device key start and end real classes. */
+export function replaySessionsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.EDGE_REPLAY_SESSIONS === "true";
+}
+
 export type RpcBatchResult = { accepted: number; duplicates: number; rejected: { event_id: string | null; reason: string }[] };

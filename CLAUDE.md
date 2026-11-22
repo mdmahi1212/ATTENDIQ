@@ -62,6 +62,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 - Gate 7 live check: `cd apps/simulator; $env:SIM_LIVE='1'; .\.venv\Scripts\python.exe -m pytest tests\test_gate7_live.py`
 - Start everything on the laptop: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 [-MqttPort 1884] [-FaceApiPort 8010]` (use -FaceApiPort when another program holds 8000)
 - Face API + tunnel only: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1`
+- Scenario video replay (2 recordings, see docs/SCENARIO_VIDEO.md): `cd apps/edge; .\.venv\Scripts\python.exe -m edge --direct --presence --video samples\scene-in.mp4 --exit-video samples\scene-out.mp4 [--video-offset S --exit-offset S] [--room-video samples\room.mp4] [--start-session [--full-class] --section IOT401-01]` (`--start-session` needs `EDGE_REPLAY_SESSIONS=true` on the server)
 - Simulator: `cd apps/simulator; .\.venv\Scripts\python.exe -m simulator run [--direct] [--finalize] [--script scripts/mismatch.yaml --hold-minutes 3]`
 - Device key (+ MQTT user): `powershell -ExecutionPolicy Bypass -File scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply] [-MqttUser <name>]`
 - Reset demo data: `powershell -ExecutionPolicy Bypass -File scripts\reset-demo.ps1`

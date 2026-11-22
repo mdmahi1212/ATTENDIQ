@@ -27,7 +27,7 @@ from edge.decision import SessionMemory, Thresholds
 from edge.gallery import Gallery
 from edge.gate import FaceDet
 from edge.geometry import Box, Point, crossing
-from edge.tracker import IouTracker
+from edge.tracker import IdTracker, IouTracker
 
 FACE_FRESH_S = 1.0  # a face counts for a body only if it was seen this recently
 MIN_VOTES = 2  # frames in which the same student's face was inside the body before we trust the identity
@@ -47,7 +47,7 @@ class BodyExitTracker:
         self.line_a, self.line_b, self.out_side = line_a, line_b, out_side
         self.gallery, self.memory, self.thr, self._report = gallery, memory, thr, report
         self.min_travel_px = min_travel_px
-        self.tracker = IouTracker(iou_min=0.2, max_missed=6, keep_embeddings=0)  # bodies move ~30-60 px per frame
+        self.tracker: IouTracker | IdTracker = IouTracker(iou_min=0.2, max_missed=6, keep_embeddings=0)  # ~30-60 px/frame
         self._who: dict[int, _Who] = {}
         self._faces: list[tuple[Point, str, float, int]] = []  # (face centre px, student, t, sighting id)
         self._seq = 0
@@ -79,15 +79,22 @@ class BodyExitTracker:
             self._faces = [f for f in self._faces if t - f[2] <= FACE_FRESH_S] + recognised
 
     # ------------------------------------------------------------ input from the body (YOLO) loop
-    def update(self, bodies: Sequence[Box], w: int, h: int, t: float) -> None:
+    def update(self, bodies: Sequence[Box], w: int, h: int, t: float, ids: Sequence[int | None] | None = None) -> None:
+        """ids: body ids from BoT-SORT + ReID (switches to id tracking for the session); None = box-overlap tracking."""
         with self._lock:
-            out = self._update(bodies, w, h, t)
+            if ids is not None and not isinstance(self.tracker, IdTracker):
+                self.tracker = IdTracker(max_missed=6)
+            out = self._update(bodies, w, h, t, ids)
         for track_id, who in out:  # report outside the lock (it emits an event)
             self._on_out(track_id, who)
 
-    def _update(self, bodies: Sequence[Box], w: int, h: int, t: float) -> list[tuple[int, _Who]]:
+    def _update(self, bodies: Sequence[Box], w: int, h: int, t: float,
+                ids: Sequence[int | None] | None) -> list[tuple[int, _Who]]:
         out: list[tuple[int, _Who]] = []
-        touched, ended = self.tracker.update([(b, 0.0, None) for b in bodies], t)
+        if isinstance(self.tracker, IdTracker):
+            touched, ended = self.tracker.update(list(zip(bodies, ids or [None] * len(bodies), strict=True)), t)
+        else:
+            touched, ended = self.tracker.update([(b, 0.0, None) for b in bodies], t)
         for tr in ended:
             self._who.pop(tr.track_id, None)
         a = (self.line_a[0] * w, self.line_a[1] * h)
@@ -134,7 +141,7 @@ class DoorBodyWatcher:
 
     def __init__(self, report: Callable[[dict[str, object]], None], min_seen_s: float = 1.0) -> None:
         self._report, self.min_seen_s = report, min_seen_s
-        self.tracker = IouTracker(iou_min=0.2, max_missed=6, keep_embeddings=0)
+        self.tracker: IouTracker | IdTracker = IouTracker(iou_min=0.2, max_missed=6, keep_embeddings=0)
         self._face_seen: dict[int, bool] = {}
         self.stats = {"bodies": 0, "no_face_entries": 0}
 
@@ -142,8 +149,14 @@ class DoorBodyWatcher:
         self.tracker.clear()
         self._face_seen.clear()
 
-    def update(self, bodies: Sequence[Box], faces: Sequence[FaceDet], t: float) -> None:
-        touched, ended = self.tracker.update([(b, 0.0, None) for b in bodies], t)
+    def update(self, bodies: Sequence[Box], faces: Sequence[FaceDet], t: float,
+               ids: Sequence[int | None] | None = None) -> None:
+        if ids is not None and not isinstance(self.tracker, IdTracker):
+            self.tracker = IdTracker(max_missed=6)
+        if isinstance(self.tracker, IdTracker):
+            touched, ended = self.tracker.update(list(zip(bodies, ids or [None] * len(bodies), strict=True)), t)
+        else:
+            touched, ended = self.tracker.update([(b, 0.0, None) for b in bodies], t)
         for tr in touched:
             if tr.track_id not in self._face_seen:
                 self._face_seen[tr.track_id] = False

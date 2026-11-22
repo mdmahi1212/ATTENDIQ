@@ -75,6 +75,9 @@ class InsideYaml(BaseModel):
     rotate: int = 0
     # Seat area polygon in normalised coords (0..1); people whose feet are outside it are not counted.
     roi: list[tuple[float, float]] = [(0.0, 0.3), (1.0, 0.3), (1.0, 1.0), (0.0, 1.0)]
+    # Body ids for exits / door bodies: BoT-SORT + re-identification in YOLO (ids survive people crossing paths).
+    # "" = simple box-overlap tracking instead.
+    body_tracker: str = "./trackers/botsort-reid.yaml"
 
 
 class ExitYaml(BaseModel):

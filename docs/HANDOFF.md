@@ -85,3 +85,7 @@ Progress:
   edge GET /api/edge/v1/cameras + POST /cameras/{gate|inside}/snapshot; edge/geometry_sync.py applies website geometry
   every 60 s, SnapshotSender every 120 s; editor modes Seat area / Exit line / Door side; demo\SETUP-CAMERAS.bat.
   Tested against local dev: snapshot upload, draw + save in editor, edge plan() -> out_side 1. Test geometry cleared.
+- 2026-11-23 #1 DONE (local commit): BoT-SORT + ReID (apps/edge/trackers/botsort-reid.yaml, model auto = YOLO features)
+  one YOLO per camera (ids live in the model); IdTracker feeds BodyExitTracker / DoorBodyWatcher; falls back to IoU if
+  tracking fails. Real check: 6 people in the InsightFace sample kept ids 1-6 over 4 frames on GPU. lap==0.5.14 pinned
+  (Ultralytics auto-installed it). Edge 58 tests.

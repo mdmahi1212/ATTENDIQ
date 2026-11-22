@@ -76,3 +76,38 @@ class IouTracker:
         ended = list(self.tracks.values())
         self.tracks.clear()
         return ended
+
+
+class IdTracker:
+    """Same interface as IouTracker, but the ids come from an external tracker (BoT-SORT + ReID in YOLO).
+    Detections without an id are ignored; a track ends when its id is not seen for max_missed updates."""
+
+    def __init__(self, max_missed: int = 8) -> None:
+        self.max_missed = max_missed
+        self.tracks: dict[int, Track] = {}
+
+    def update(self, dets: list[tuple[Box, int | None]], t: float) -> tuple[list[Track], list[Track]]:
+        touched: list[Track] = []
+        for box, tid in dets:
+            if tid is None:
+                continue
+            tr = self.tracks.get(tid)
+            if tr is None:
+                tr = self.tracks[tid] = Track(tid, box, t, t)
+            tr.box, tr.last_seen, tr.missed = box, t, 0
+            tr.history.append(centre(box))
+            del tr.history[:-60]
+            touched.append(tr)
+        seen = {tr.track_id for tr in touched}
+        ended: list[Track] = []
+        for tid in list(self.tracks):
+            if tid not in seen:
+                self.tracks[tid].missed += 1
+                if self.tracks[tid].missed > self.max_missed:
+                    ended.append(self.tracks.pop(tid))
+        return touched, ended
+
+    def clear(self) -> list[Track]:
+        ended = list(self.tracks.values())
+        self.tracks.clear()
+        return ended

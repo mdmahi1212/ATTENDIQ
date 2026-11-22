@@ -248,23 +248,26 @@ def main(argv: list[str] | None = None) -> int:
     log.info("detector ready on %s; room %s; source %s; mode %s; rotate %s", detector.device, room, source,
              gate_cfg.entry_mode, args.rotate if args.rotate is not None else cfg.gate.rotate)
 
-    # One YOLO person model shared by the door camera (bodies) and the room camera (count + bodies at the exit).
-    yolo_lock = threading.Lock()
-    yolo_holder: dict[str, Any] = {}
+    # One YOLO person model PER CAMERA: BoT-SORT keeps its body ids inside the model, so cameras must not share one.
+    def new_yolo() -> Any:
+        from edge.occupancy import YoloPersonDetector
 
-    def yolo_model() -> Any:
-        with yolo_lock:
-            if "m" not in yolo_holder:
-                from edge.occupancy import YoloPersonDetector
+        w = str(resolve(env.yolo_weights)) if resolve(env.yolo_weights).exists() else env.yolo_weights
+        return YoloPersonDetector(w, cfg.inside.conf, cfg.inside.device)
 
-                w = str(resolve(env.yolo_weights)) if resolve(env.yolo_weights).exists() else env.yolo_weights
-                yolo_holder["m"] = YoloPersonDetector(w, cfg.inside.conf, cfg.inside.device)
-            return yolo_holder["m"]
+    tracker_cfg = str(resolve(cfg.inside.body_tracker)) if cfg.inside.body_tracker else ""
+    reid_failed: set[str] = set()
 
-    def person_boxes(frame: Any) -> list[Any]:
-        model = yolo_model()
-        with yolo_lock:
-            return model(frame)
+    def bodies_with_ids(model: Any, frame: Any, cam: str) -> tuple[list[Any], list[Any] | None]:
+        """(boxes, ids) with BoT-SORT + ReID ids, or (boxes, None) when tracking is off / failed."""
+        if tracker_cfg and cam not in reid_failed:
+            try:
+                tracked = model.track(frame, tracker_cfg)
+                return [b for b, _ in tracked], [i for _, i in tracked]
+            except Exception as e:  # noqa: BLE001 - fall back to plain detection, keep the camera running
+                reid_failed.add(cam)
+                log.warning("body re-identification off for the %s camera (%s); using box overlap", cam, e)
+        return model(frame), None
 
     door_bodies = None
     if cfg.gate.body_tracking:
@@ -275,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
     def occupancy_loop(cam: Camera) -> None:
         from edge.occupancy import OccupancyCounter, annotate, in_roi
 
-        yolo = yolo_model()
+        yolo = new_yolo()
         counter = OccupancyCounter(cfg.inside.window, cfg.inside.stable_count_seconds)
         session_seen = None
         next_pub = next_count = 0.0
@@ -295,10 +298,13 @@ def main(argv: list[str] | None = None) -> int:
                 snaps.offer("inside", rotate_frame(frame, cfg.inside.rotate))
             if frame is not None and gate.session_id is not None:
                 frame = rotate_frame(frame, cfg.inside.rotate)
-                boxes = person_boxes(frame)
+                if body_exit:
+                    boxes, ids = bodies_with_ids(yolo, frame, "room")
+                    # all bodies, not only seated ones: people walking to the door leave the seat area
+                    body_exit.update(boxes, frame.shape[1], frame.shape[0], time.monotonic(), ids)
+                else:
+                    boxes = yolo(frame)
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
-                if body_exit:  # all bodies, not only seated ones: people walking to the door leave the seat area
-                    body_exit.update(boxes, frame.shape[1], frame.shape[0], time.monotonic())
                 if t >= next_count or sample is None:
                     next_count = t + cfg.inside.interval_s
                     sample = counter.add(len(kept), t)
@@ -401,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
     last_seq, n = -1, 0
-    next_body, last_bodies = 0.0, []
+    next_body, last_bodies, door_yolo = 0.0, [], None
     demo_started = False
     if args.demo:
         log.info("demo: waiting for a live class in room %s (start it on the website)", room)
@@ -433,8 +439,10 @@ def main(argv: list[str] | None = None) -> int:
             bodies: list[Any] = []
             if door_bodies and now >= next_body:
                 next_body = now + 0.2  # bodies at ~5 fps are enough to follow a walk
-                bodies = person_boxes(frame)
-                door_bodies.update(bodies, faces, now)
+                if door_yolo is None:
+                    door_yolo = new_yolo()
+                bodies, body_ids = bodies_with_ids(door_yolo, frame, "door")
+                door_bodies.update(bodies, faces, now, body_ids)
                 last_bodies = bodies
             if liveview and liveview.due("gate"):
                 from edge.liveview import draw_bodies, draw_faces

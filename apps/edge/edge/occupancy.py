@@ -92,6 +92,14 @@ class YoloPersonDetector:
         res = self._model.predict(frame, classes=[0], conf=self.conf, verbose=False, device=self.device)[0]
         return [tuple(float(v) for v in b) for b in res.boxes.xyxy.tolist()]  # type: ignore[misc]
 
+    def track(self, frame: np.ndarray, tracker: str) -> list[tuple[Box, int | None]]:
+        """Bodies with a persistent id from BoT-SORT + re-identification (one detector instance per camera)."""
+        res = self._model.track(frame, classes=[0], conf=self.conf, verbose=False, device=self.device,
+                                persist=True, tracker=tracker)[0]
+        boxes = [tuple(float(v) for v in b) for b in res.boxes.xyxy.tolist()]
+        ids = res.boxes.id.int().tolist() if res.boxes.id is not None else [None] * len(boxes)
+        return list(zip(boxes, ids, strict=True))  # type: ignore[arg-type]
+
 
 def annotate(frame: np.ndarray, boxes: Sequence[Box], kept: Sequence[Box], roi_norm: Sequence[Point] | None,
              count: int) -> np.ndarray:

@@ -51,6 +51,7 @@ PyYAML==6.0.3
 requests==2.34.2
 ruff==0.17.5
 scikit-image==0.26.0
+lap==0.5.14
 scipy==1.17.1
 sympy==1.14.0
 tifffile==2026.3.3

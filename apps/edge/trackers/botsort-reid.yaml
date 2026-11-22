@@ -1,0 +1,14 @@
+# BoT-SORT with re-identification for AttendIQ body tracking (fixed cameras).
+# Each body keeps its id when people cross paths: matched by appearance (YOLO's own features), not only box overlap.
+tracker_type: botsort
+track_high_thresh: 0.35
+track_low_thresh: 0.1
+new_track_thresh: 0.4
+track_buffer: 60        # frames a lost body is remembered (~12 s at 5 fps): someone hidden behind another person
+match_thresh: 0.8
+fuse_score: True
+gmc_method: none        # the phones do not move: no camera-motion compensation needed
+proximity_thresh: 0.5
+appearance_thresh: 0.8  # high = an id only moves to a body that really looks the same
+with_reid: True
+model: auto             # use the detector's own features (no extra model download)

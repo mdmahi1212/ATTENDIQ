@@ -127,3 +127,29 @@ def test_gate_reports_unknown_entry_with_red_led() -> None:
     pipe.start(uuid.uuid4(), GALLERY)
     pipe.report_unknown_entry({"via": "body", "face": "not seen"})
     assert [e.event_type.value for e in events] == ["GATE_ENTRY_UNKNOWN"] and fb == ["unknown"]
+
+
+# ---------------------------------------------------------------- body ids from BoT-SORT + ReID
+def test_identity_follows_the_tracker_id_when_two_people_cross() -> None:
+    tr, reports, _ = make()
+    # two seated students: A at x=500 (id 7), B at x=300 (id 8); faces seen while sitting
+    for k in range(3):
+        t = k * 0.2
+        tr.faces([FaceDet((475, 120, 525, 180), 0.9, near(A, 0.8, 20 + k)),
+                  FaceDet((275, 120, 325, 180), 0.9, near(B, 0.8, 30 + k))], t)
+        tr.update([body(500), body(300)], W, H, t, ids=[7, 8])
+    # A walks to the door, passing right through B's box; ReID keeps A's id = 7 the whole way
+    for k, x in enumerate(range(460, 90, -40)):
+        tr.update([body(x), body(300)], W, H, 1.0 + k * 0.2, ids=[7, 8])
+    assert [sid for sid, _ in reports] == ["stu-a"]
+
+
+def test_id_tracker_ends_tracks_that_disappear() -> None:
+    from edge.tracker import IdTracker
+
+    it = IdTracker(max_missed=2)
+    touched, ended = it.update([((0, 0, 10, 10), 5), ((50, 0, 60, 10), None)], 0.0)
+    assert [t.track_id for t in touched] == [5] and ended == []
+    for k in range(3):
+        _, ended = it.update([], 0.1 * (k + 1))
+    assert [t.track_id for t in ended] == [5]

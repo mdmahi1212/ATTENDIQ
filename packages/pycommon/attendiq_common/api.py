@@ -74,9 +74,10 @@ class EdgeApi:
     def demo_session(self, started_minutes_ago: int, minutes: int) -> dict[str, Any]:
         return self._call("POST", "/sessions/demo", json={"started_minutes_ago": started_minutes_ago, "minutes": minutes}).json()
 
-    def replay_session(self, minutes: int, section: str | None = None) -> dict[str, Any]:
+    def replay_session(self, minutes: int, section: str | None = None, demo_timing: bool = False,
+                       staff_count: int = 1) -> dict[str, Any]:
         """Recorded-video presentation: start a REAL class in this device's room now (server needs EDGE_REPLAY_SESSIONS)."""
-        body: dict[str, Any] = {"minutes": minutes}
+        body: dict[str, Any] = {"minutes": minutes, "demo_timing": demo_timing, "staff_count": staff_count}
         if section:
             body["section"] = section
         return self._call("POST", "/sessions/replay", json=body).json()

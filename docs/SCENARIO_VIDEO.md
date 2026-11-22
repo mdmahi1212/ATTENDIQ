@@ -42,6 +42,68 @@ Open each file in any player and note the second of the clap (e.g. phone 1 at 3.
 Skip the earlier part of the one that started first, so both start at the clap:
 `--video-offset 3.4 --exit-offset 1.2`.
 
+## Full demo class (same as a real class, 10 minutes)
+
+Three recordings, every rule of a real class, compressed timing. Use this for the class presentation.
+
+| Phone | Films | Used for |
+|---|---|---|
+| Phone 1 | the door from inside (faces walking in) | entry recognition → present / late |
+| Phone 2 | beside the door, looking into the room (faces walking out) | exit recognition → left / came back |
+| Phone 3 | the seats, from the front or a corner, everyone in view | people count (YOLO11x) → count checks |
+
+**Demo timing** (only this class; real classes keep the normal policy): present until **2 min**, late until **5 min**,
+count check from **minute 2**, then every minute (push "verify now" to unmarked students, 3 min to answer),
+professor's end-of-class count alert **2 min before the end**. The class ends **by itself** at its scheduled end
+and is finalized by the server exactly like a timetable class. The rule engine runs once a minute, so things
+can show up to ~1 min after they happen in the video.
+
+### Script (record ~9 minutes; clap once at the start in view of all three phones)
+
+One friend plays the professor and sits in phone 3's view the whole time (`--staff 1`, the default).
+
+| Time | Who | Action | What the system does |
+|---|---|---|---|
+| 0:10 | A | walks in | green LED, **present** |
+| 0:20 | B | walks in | **present** |
+| 0:30 | C | walks in | **present** |
+| 0:40 | X | walks in looking down / hood up (face not seen) | nothing: X stays pending |
+| 0:50 | E (not enrolled) | walks in, looks around, leaves at 1:20 | red LED, unknown person |
+| 1:20 → | everyone | sit still in phone 3's view | room count becomes stable |
+| ~2:00–3:00 | — | count 4 > 3 marked | **"Verify now" push** to the unmarked students |
+| live | X | during the presentation, verifies on their phone: face + blink/turn + scan the room QR on the professor's live page | X → **present** |
+| 3:00 | L | walks in | **late** (after 2 min) |
+| 4:00 | B | walks out | amber LED, B left |
+| 4:45 | B | walks back in | re-entry, B stays present |
+| 6:00 | C | walks out and does not come back | amber LED |
+| ~8:00 | — | end-of-class check: 4 in the room, 5 marked present | **professor alert** "Count does not match" |
+| 9:00 | — | stop all three recordings | the class keeps running |
+| 10:00 | — | class ends by itself | **final:** A, B, X present · L late · C absent (`left_no_return`) · D (never came) absent |
+
+Do NOT press Start recheck after the professor alert in this demo: A, B and L are on video, not in the room with
+their phones, so they could not answer and would become `left_early`. Show the alert instead. (Press it only
+if everyone marked present is really in the presentation room with their phone.)
+
+### Run it
+
+```powershell
+# real network path, same as a real class: Mosquitto + ingest + face API (close the live edge window it opens)
+powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 -MqttPort 1884
+cd apps\edge
+.\.venv\Scripts\python.exe -m edge --presence --start-session --full-class --section IOT401-01 `
+  --video samples\door.mp4 --video-offset 3.4 `
+  --exit-video samples\way-out.mp4 --exit-offset 1.2 `
+  --room-video samples\room.mp4 --room-offset 2.0
+```
+
+On screen: http://127.0.0.1:8090 (three camera views + door LED) next to the professor's live page
+(statuses, room count, door timeline, room QR). X needs their own phone with the AttendIQ app and notifications on.
+The edge prints the final table when the server has ended the class.
+
+`config.yaml` for this run: `exit.enabled: true`, `exit.mode: presence`, `inside.enabled: true` (counting),
+`gate.rotate: 0`, `inside.rotate: 0`, `liveview.enabled: true`; set `inside.roi` to the seat area of phone 3
+(the default is the lower 70 % of the picture).
+
 ## Presentation mode: one command, the class starts and ends with the videos
 
 ```powershell

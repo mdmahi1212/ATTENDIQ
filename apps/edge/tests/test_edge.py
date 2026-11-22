@@ -392,6 +392,13 @@ def test_class_minutes_covers_the_videos_with_db_minimum() -> None:
     assert class_minutes(4 * 3600) == 60
 
 
+def test_full_class_lasts_as_long_as_the_videos() -> None:
+    from edge.replay import full_class_minutes
+
+    assert full_class_minutes(9.5 * 60) == 10 and full_class_minutes(12.2 * 60) == 13 and full_class_minutes(60) == 10
+    assert full_class_minutes(60, requested=15) == 15 and full_class_minutes(60, requested=5) == 10
+
+
 def test_video_seconds_reads_the_file_length(tmp_path) -> None:  # noqa: ANN001
     import cv2
 

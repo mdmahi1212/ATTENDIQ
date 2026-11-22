@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { json, requireDevice } from "@/lib/edge/route-helpers";
-import { replaySessionSchema, replaySessionsEnabled } from "@/lib/edge/schemas";
+import { DEMO_POLICY, replaySessionSchema, replaySessionsEnabled } from "@/lib/edge/schemas";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -40,11 +40,20 @@ export async function POST(request: NextRequest) {
     p_simulation: false,
   });
   if (error) return json({ error: error.message }, error.code === "55000" ? 409 : 400);
+  // The session already holds the global policy (merged at start); demo timing overrides only the time windows.
+  const { data: started } = await admin.from("class_sessions").select("policy").eq("id", String(id)).single();
+  const policy = { ...((started?.policy as Record<string, unknown> | null) ?? {}), ...(parsed.data.demo_timing ? DEMO_POLICY : {}) };
+  const { error: updErr } = await admin.from("class_sessions")
+    .update({ policy, staff_count: parsed.data.staff_count }).eq("id", String(id));
+  if (updErr) return json({ error: "could not apply demo settings" }, 500);
   // Marker that THIS device started the class: only then may it end it (POST /sessions/{id}/end).
   await admin.from("audit_log").insert({
     action: "replay_start", entity: "class_sessions", entity_id: String(id),
-    after: { device_id: device.id, section: section.name, minutes: parsed.data.minutes }, reason: "recorded video replay",
+    after: { device_id: device.id, section: section.name, minutes: parsed.data.minutes, demo_timing: parsed.data.demo_timing,
+             staff_count: parsed.data.staff_count },
+    reason: "recorded video replay",
   });
   console.log(JSON.stringify({ at: "edge.replay-session", device: device.name, session: id, section: section.name }));
-  return json({ session_id: id, section: section.name, students_with_face: section.faces }, 201);
+  return json({ session_id: id, section: section.name, students_with_face: section.faces,
+                demo_timing: parsed.data.demo_timing ? DEMO_POLICY : null }, 201);
 }

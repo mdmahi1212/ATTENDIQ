@@ -22,6 +22,16 @@ def video_seconds(path: str, skip_s: float = 0.0) -> float:
     return max(0.0, frames / fps - skip_s)
 
 
+DEMO_END_ALERT_MIN = 2  # matches DEMO_POLICY.recheck_before_end_min in apps/web/lib/edge/schemas.ts
+
+
+def full_class_minutes(video_s: float, requested: int | None = None) -> int:
+    """--full-class: the class lasts as long as the videos (it then ends by itself), at least the DB minimum of 10."""
+    if requested:
+        return min(60, max(10, requested))
+    return min(60, max(10, math.ceil(video_s / 60)))
+
+
 def class_minutes(video_s: float) -> int:
     """Scheduled class length: the videos + 2 min margin, at least the DB minimum of 10 (it is ended early anyway)."""
     return min(60, max(10, math.ceil(video_s / 60) + 2))

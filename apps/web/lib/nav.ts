@@ -3,7 +3,7 @@ import type { Role } from "@/lib/roles";
 /** Icon names are mapped to lucide icons in the client nav (components can't cross the server/client boundary). */
 export type IconName =
   | "dashboard" | "building" | "calendar" | "book" | "layers" | "door" | "clock" | "users" | "user-plus" | "scan"
-  | "chart" | "history" | "settings" | "cpu" | "bell" | "home" | "check" | "gavel" | "camera";
+  | "chart" | "history" | "settings" | "cpu" | "bell" | "home" | "check" | "gavel" | "camera" | "play";
 export type NavItem = { href: string; label: string; icon: IconName };
 export type NavGroup = { label?: string; items: NavItem[] };
 
@@ -41,6 +41,7 @@ const GROUPS: Record<Role, NavGroup[]> = {
     {
       label: "System",
       items: [
+        { href: "/admin/demo", label: "Demo", icon: "play" },
         { href: "/admin/settings", label: "Settings", icon: "settings" },
         { href: "/operator", label: "Devices (operator)", icon: "cpu" },
         inbox,

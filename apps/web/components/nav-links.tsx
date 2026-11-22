@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CirclePlay,
   Bell, BookOpen, Building2, CalendarDays, Camera, ChartColumn, CircleCheck, Clock, Cpu, DoorOpen, Ellipsis, Gavel,
   History, House, Layers, LayoutDashboard, ScanFace, Settings, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 const ICONS: Record<IconName, LucideIcon> = {
   dashboard: LayoutDashboard, building: Building2, calendar: CalendarDays, book: BookOpen, layers: Layers, door: DoorOpen,
   clock: Clock, users: Users, "user-plus": UserPlus, scan: ScanFace, chart: ChartColumn, history: History,
-  settings: Settings, cpu: Cpu, bell: Bell, home: House, check: CircleCheck, gavel: Gavel, camera: Camera,
+  settings: Settings, cpu: Cpu, bell: Bell, home: House, check: CircleCheck, gavel: Gavel, camera: Camera, play: CirclePlay,
 };
 
 export function NavIcon({ name, className }: { name: IconName; className?: string }) {

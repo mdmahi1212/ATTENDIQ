@@ -2,8 +2,6 @@
 
 import { z } from "zod";
 import { check, formAction } from "@/lib/admin-action";
-import { DEMO_MINUTES, withDemoPolicy } from "@/lib/demo";
-import type { Json } from "@/lib/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sectionSchema, sectionStaffSchema } from "@/lib/validation";
 
@@ -74,20 +72,13 @@ export const startTestSession = formAction({
     minutes: z.coerce.number().int().min(10).max(240).default(30),
     // Demo: start the class N minutes in the past so a walk-in now counts as late (demo script step 6).
     started_minutes_ago: z.coerce.number().int().min(0).max(60).default(0),
-    // Recorded-video demo class: 10 minutes with the shortened demo rules (lib/demo.ts).
-    demo: z.enum(["0", "1"]).default("0"),
   }),
   revalidate: "/admin/sections",
-  run: async ({ id, minutes, started_minutes_ago, demo }, { supabase }) => {
+  run: async ({ id, minutes, started_minutes_ago }, { supabase }) => {
     const { data: section } = check(await supabase.from("sections").select("room_id").eq("id", id).single());
     if (!section?.room_id) return { ok: false, message: "Give the section a room first." };
-    const admin = createAdminClient();
-    if (demo === "1") {
-      minutes = DEMO_MINUTES;
-      started_minutes_ago = 0;
-    }
     const { data: sessionId } = check(
-      await admin.rpc("create_adhoc_session", {
+      await createAdminClient().rpc("create_adhoc_session", {
         p_room: section.room_id,
         p_section: id,
         p_starts_at: new Date(Date.now() - started_minutes_ago * 60_000).toISOString(),
@@ -95,11 +86,6 @@ export const startTestSession = formAction({
         p_simulation: false,
       }),
     );
-    if (demo === "1") {
-      const { data: s } = check(await admin.from("class_sessions").select("policy").eq("id", String(sessionId)).single());
-      check(await admin.from("class_sessions").update({ policy: withDemoPolicy(s?.policy) as Json }).eq("id", String(sessionId)));
-      return `Video demo class started (${DEMO_MINUTES} min, demo timing: present 2 min, late until 8, professor alert at 7). Run scripts/run-video-demo.ps1 on the laptop now (id ${String(sessionId).slice(0, 8)}…).`;
-    }
     return `Test session started ${started_minutes_ago ? `${started_minutes_ago} min ago` : "now"} for ${minutes} min (id ${String(sessionId).slice(0, 8)}…). Enrolled students are 'pending' until the gate camera sees them.`;
   },
 });

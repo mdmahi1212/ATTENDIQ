@@ -53,3 +53,8 @@ Progress:
   Camera settings for recordings: apps/edge/config.demo.yaml (gitignored; make it after seeing the videos: rotation,
   exit line, seat ROI). Edge 39 tests, web 128, lint/tsc/build ok. NOT yet run with real recordings.
   Scenario (Mahi + Fahim, ~9 min): 0:30 Mahi in; 3:00 Fahim in (late); 5:00 Mahi out, 5:40 back; 6:30 Fahim out for good.
+- 2026-11-23 Admin -> Demo page (/admin/demo): per section 5 / 10 / 15 min (demo timing, lib/demo.ts demoPolicy(m)) or
+  Full class (timetable length, normal rules); "Running now" list with Open class / Live dashboard; timing table;
+  how-to (live phones or recorded videos). DB: create_adhoc_session allows 5..240 min (migration
+  20261122181258, applied; checked in a rolled-back test). Sections page button removed (moved to Demo).
+  Checks: web unit 131, tsc, lint, build; page checked desktop + 375 px. Start buttons NOT clicked (would start a real class).

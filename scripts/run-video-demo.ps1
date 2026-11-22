@@ -3,7 +3,7 @@
   Recorded-video demo class: plays two phone recordings as the door and inside cameras of a live class.
 
 .USAGE
-  1. Admin -> Sections -> IOT401-01 -> "Video demo class (10 min)"   (starts a real 10-minute class, demo timing)
+  1. Admin -> Demo -> IOT401-01 -> 5 / 10 / 15 min or Full class   (starts a real class; short ones use demo timing)
   2. powershell -ExecutionPolicy Bypass -File scripts\run-video-demo.ps1 -Door C:\videos\door.mp4 -Room C:\videos\room.mp4
      The edge waits for the live class, then plays both recordings together in real time (live view:
      http://127.0.0.1:8090), keeps their last frames when they end, and stops when the class ends.
@@ -38,7 +38,7 @@ Write-Host "  room video : $Room"
 Write-Host "  settings   : apps\edge\$cfgName"
 Write-Host "  live view  : http://127.0.0.1:8090"
 Write-Host "  log        : $log"
-Write-Host "Waiting for the class: press 'Video demo class (10 min)' on the website (Admin -> Sections)."
+Write-Host "Waiting for the class: press a length on the website (Admin -> Demo)."
 Start-Process "http://127.0.0.1:8090"
 
 Push-Location $edge

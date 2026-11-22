@@ -47,3 +47,9 @@ Progress:
 - 2026-11-23: cloud session's recorded-video demo (PR #1+#2, 13 commits) REVERTED here (user: build the demo here, live phones).
   Tests back to edge 38 / web 125, tsc clean. Revert commit local, NOT pushed (user must say push).
   NEXT: live 2-phone class here: phone 1 gate (outside), phone 2 inside (count + exit), liveview on, Mahi + Fahim.
+- 2026-11-23 VIDEO DEMO (built here): Admin -> Sections -> "Video demo class (10 min)" (lib/demo.ts demo policy: present 2,
+  late until 8, checks from 2 every 2, tolerance 0, alert at 7) + `scripts/run-video-demo.ps1 -Door x -Room y`
+  (edge --direct --demo: waits for live class, plays both videos together, holds last frame, exits at class end).
+  Camera settings for recordings: apps/edge/config.demo.yaml (gitignored; make it after seeing the videos: rotation,
+  exit line, seat ROI). Edge 39 tests, web 128, lint/tsc/build ok. NOT yet run with real recordings.
+  Scenario (Mahi + Fahim, ~9 min): 0:30 Mahi in; 3:00 Fahim in (late); 5:00 Mahi out, 5:40 back; 6:30 Fahim out for good.

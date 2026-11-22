@@ -2,6 +2,10 @@
 
 Default: reads the gate camera from .env, publishes events over MQTT (SQLite outbox first).
 --video FILE  play a recorded video instead of the live camera (real-time speed), exit at the end.
+--demo --video door.mp4 --room-video room.mp4
+              recorded-video class: wait until a class is live in the room (started on the website), play both
+              recordings together in real time as the door and inside cameras, keep their last frames when they
+              end, and exit when the class ends. Run it with scripts/run-video-demo.ps1.
 --direct      POST events straight to the web API instead of MQTT (no broker needed; still uses the outbox).
 """
 
@@ -35,12 +39,18 @@ log = logging.getLogger("edge")
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="edge")
     ap.add_argument("--video", help="video file instead of the live gate camera")
+    ap.add_argument("--room-video", help="video file instead of the live inside camera (with --demo)")
+    ap.add_argument("--demo", action="store_true",
+                    help="recorded-video class: wait for a live session in the room, then play --video (door) and "
+                         "--room-video (room) together in real time; exit when the session ends")
     ap.add_argument("--direct", action="store_true", help="POST events to the API instead of MQTT")
     ap.add_argument("--presence", action="store_true", help="entry_mode=presence (overrides config.yaml)")
     ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], help="rotate gate frames clockwise (overrides config.yaml)")
     ap.add_argument("--no-inside", action="store_true", help="do not run the inside (occupancy) camera")
     ap.add_argument("--debug", action="store_true", help="write the annotated inside frame to data/inside-debug.jpg")
     args = ap.parse_args(argv)
+    if args.demo and not args.video:
+        ap.error("--demo needs --video (door recording)")
 
     env = Env()  # type: ignore[call-arg]
     cfg = load_yaml(env.edge_config_path)
@@ -131,6 +141,9 @@ def main(argv: list[str] | None = None) -> int:
             if not session_id:
                 if current:
                     log.info("session stop (%s)", reason)
+                    if args.demo:
+                        log.info("demo: the class has ended; stopping")
+                        stop.set()
                 gate.stop()
                 if exit_gate:
                     exit_gate.stop()
@@ -188,8 +201,9 @@ def main(argv: list[str] | None = None) -> int:
                       payload={"camera": name, "failures": failures}))
 
     source = args.video or env.gate_camera_source
-    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera)
-    camera.start()
+    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera, hold_last=args.demo)
+    if not args.demo:  # demo: both recordings start together when the class goes live (main loop)
+        camera.start()
 
     from edge.detector import InsightFaceDetector
 
@@ -274,7 +288,8 @@ def main(argv: list[str] | None = None) -> int:
         while not stop.is_set():
             now = time.monotonic()
             if now >= next_poll:
-                next_poll = now + cfg.control_poll_seconds
+                # demo: poll fast until the class is live, so the recordings start within ~2 s of the start
+                next_poll = now + (2 if args.demo and gate.session_id is None else cfg.control_poll_seconds)
                 try:
                     s = api.current_session(room)
                     set_session(str(s["id"]) if s else None, "poll")
@@ -306,9 +321,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # ------------------------------------------------------------ inside camera (occupancy)
     inside_cam: Camera | None = None
-    if (cfg.inside.enabled or exit_gate) and env.inside_camera_source and not args.no_inside and not args.video:
-        inside_cam = Camera("inside", env.inside_camera_source, on_camera)
-        inside_cam.start()
+    inside_source = str(resolve(args.room_video)) if args.room_video else env.inside_camera_source
+    if (cfg.inside.enabled or exit_gate) and inside_source and not args.no_inside and (args.room_video or not args.video):
+        inside_cam = Camera("inside", inside_source, on_camera, hold_last=args.demo)
+        if not args.demo:
+            inside_cam.start()
         if cfg.inside.enabled:  # people counting (off when the inside camera only watches the way out)
             threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
         if exit_gate:
@@ -317,9 +334,18 @@ def main(argv: list[str] | None = None) -> int:
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
     last_seq, n = -1, 0
+    demo_started = False
+    if args.demo:
+        log.info("demo: waiting for a live class in room %s (start it on the website)", room)
     try:
         while not stop.is_set():
-            if args.video and camera.ended:
+            if args.demo and not demo_started and gate.session_id is not None:
+                demo_started = True
+                for cam in (camera, inside_cam):
+                    if cam:
+                        cam.start()
+                log.info("demo: class is live, playing the recordings")
+            if args.video and camera.ended and not args.demo:
                 time.sleep(2)  # let the last decisions publish
                 break
             seq, frame, _ = camera.latest()

@@ -53,10 +53,13 @@ class Backoff:
 class Camera:
     def __init__(self, name: str, source: str, on_status: Callable[[str, bool, int], None] | None = None,
                  opener: Callable[[str], Capture] = open_capture, loop_file: bool = False,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep, hold_last: bool = False) -> None:
         self.name, self.source = name, source
         self._open, self._on_status, self._sleep = opener, on_status, sleep
         self._loop_file = loop_file
+        # Recorded demo: at the end of a file keep showing the last frame and stay "online", so a finished
+        # recording is not reported as camera downtime while the class is still running.
+        self._hold_last = hold_last
         self._lock = threading.Lock()
         self._frame: np.ndarray | None = None
         self._frame_at = 0.0
@@ -126,7 +129,10 @@ class Camera:
             cap.release()
             if file_mode and not self._loop_file:
                 self.ended = True
-                self._set_online(False)
+                if self._hold_last:
+                    log.info("camera %s: recording ended, holding the last frame", self.name)
+                else:
+                    self._set_online(False)
                 return
             self.failures += 1
             self._set_online(False)

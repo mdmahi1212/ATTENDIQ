@@ -63,6 +63,13 @@ export default async function SectionsPage() {
                       variant="outline"
                       confirm="Start a real session whose start time is 12 minutes ago (walk-ins now count as late)?"
                     />
+                    <RowAction
+                      action={startTestSession}
+                      fields={{ id: s.id, demo: "1" }}
+                      label="Video demo class (10 min)"
+                      variant="outline"
+                      confirm="Start a real 10-minute class with demo timing (present 2 min, late until 8, professor alert at 7)? Then run scriptsun-video-demo.ps1 on the laptop to play the two recordings."
+                    />
                     <RowAction action={deleteSection} fields={{ id: s.id }} label="Delete" variant="destructive" confirm="Delete this section?" />
                   </span>
                 </CardTitle>

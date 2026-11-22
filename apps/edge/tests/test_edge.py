@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 import numpy as np
 from conftest import near, unit
@@ -199,6 +200,21 @@ def test_camera_reports_offline_then_online_and_reconnects() -> None:
     assert statuses[:3] == [False, True, False]
     seq, frame, _ = cam.latest()
     assert seq == 3 and frame is not None
+
+
+def test_recorded_file_ends_offline_unless_holding_last_frame(tmp_path: Path) -> None:
+    video = tmp_path / "door.mp4"
+    video.write_bytes(b"")  # is_file() only checks that the path exists
+    for hold, expected in ((False, [True, False]), (True, [True])):
+        statuses: list[bool] = []
+        cam = Camera("gate", str(video), lambda n, online, f, s=statuses: s.append(online),
+                     opener=lambda _s: FakeCap(2), hold_last=hold)
+        cam.start()
+        assert cam._thread is not None
+        cam._thread.join(2)  # the reader thread returns after the file's last frame
+        assert cam.ended and statuses == expected
+        seq, frame, _ = cam.latest()
+        assert seq == 2 and frame is not None  # the last frame stays available
 
 
 # ---------------------------------------------------------------- gate pipeline end to end

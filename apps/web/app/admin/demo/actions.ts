@@ -38,7 +38,11 @@ export const startDemoClass = formAction({
     if (!full) {
       const { data: s } = check(await admin.from("class_sessions").select("policy").eq("id", String(sessionId)).single());
       check(
-        await admin.from("class_sessions").update({ policy: withDemoPolicy(s?.policy, minutes) as Json }).eq("id", String(sessionId)),
+        // staff_count 0: no professor walks through a short demo, so every person the room camera counts is a student.
+        await admin
+          .from("class_sessions")
+          .update({ policy: withDemoPolicy(s?.policy, minutes) as Json, staff_count: 0 })
+          .eq("id", String(sessionId)),
       );
     }
     return `${full ? "Full" : `${minutes}-minute demo`} class started (${minutes} min). Cameras and the laptop pick it up within seconds.`;

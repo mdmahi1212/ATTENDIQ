@@ -153,3 +153,45 @@ def test_id_tracker_ends_tracks_that_disappear() -> None:
     for k in range(3):
         _, ended = it.update([], 0.1 * (k + 1))
     assert [t.track_id for t in ended] == [5]
+
+
+# ---------------------------------------------------------------- two-camera exit + leaving at the door
+def test_door_body_walking_away_is_leaving_not_an_unknown_entry() -> None:
+    from edge.bodyexit import DoorBodyWatcher
+
+    reports: list[dict] = []
+    left: list[float] = []
+    w = DoorBodyWatcher(reports.append, min_seen_s=1.0, on_leave=left.append)
+    for k, hgt in enumerate([300, 280, 250, 220, 190, 170, 150]):  # shrinking: walking away down the corridor
+        w.update([(300, 100, 380, 100 + hgt)], [], k * 0.2)
+    for k in range(8):
+        w.update([], [], 1.4 + k * 0.2)
+    assert reports == [] and len(left) == 1
+
+
+def test_named_body_lost_at_the_door_side_plus_door_leaving_is_reported_out() -> None:
+    from edge.bodyexit import ExitFusion
+
+    tr, reports, _ = make()
+    walk(tr, [500, 500, 500], face_emb=near(B, 0.8, 7))  # B sits, face seen
+    for k, x in enumerate([530, 560, 590, 615]):  # walks out of the picture on the right (door outside the picture)
+        tr.update([body(x)], W, H, 0.6 + k * 0.2)
+    for k in range(8):  # gone
+        tr.update([], W, H, 1.4 + k * 0.2)
+    lost = tr.vanished
+    out: list[tuple[str, dict]] = []
+    f = ExitFusion(lambda sid, p: out.append((sid, p)))
+    f.room_vanished(lost)
+    assert out == []  # the door camera has not seen anyone go yet
+    f.door_leaving(lost[0][1] + 4.0)
+    assert [sid for sid, _ in out] == ["stu-b"] and out[0][1]["via"] == "two-camera"
+
+
+def test_lost_body_without_anyone_leaving_at_the_door_is_ignored() -> None:
+    from edge.bodyexit import ExitFusion
+
+    out: list[tuple[str, dict]] = []
+    f = ExitFusion(lambda sid, p: out.append((sid, p)))
+    f.room_vanished([("stu-a", 10.0)])
+    f.door_leaving(40.0)  # much later: someone else
+    assert out == []

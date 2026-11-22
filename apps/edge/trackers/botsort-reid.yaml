@@ -4,7 +4,7 @@ tracker_type: botsort
 track_high_thresh: 0.35
 track_low_thresh: 0.1
 new_track_thresh: 0.4
-track_buffer: 60        # frames a lost body is remembered (~12 s at 5 fps): someone hidden behind another person
+track_buffer: 300       # frames a lost body is remembered (~60 s at 5 fps): hidden behind someone, bent over a desk
 match_thresh: 0.8
 fuse_score: True
 gmc_method: none        # the phones do not move: no camera-motion compensation needed

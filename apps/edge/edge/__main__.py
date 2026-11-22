@@ -262,9 +262,9 @@ def main(argv: list[str] | None = None) -> int:
                                    liveness=use_liveness)
     detector_lock = threading.Lock()  # the gate loop and the exit loop share one InsightFace model
 
-    def detect(frame: Any) -> list[Any]:
+    def detect(frame: Any, tiles: int = 1) -> list[Any]:
         with detector_lock:
-            return detector(frame)
+            return detector(frame, tiles)
 
     log.info("detector ready on %s; room %s; source %s; mode %s; rotate %s", detector.device, room, source,
              gate_cfg.entry_mode, args.rotate if args.rotate is not None else cfg.gate.rotate)
@@ -290,11 +290,20 @@ def main(argv: list[str] | None = None) -> int:
                 log.warning("body re-identification off for the %s camera (%s); using box overlap", cam, e)
         return model(frame), None
 
+    fusion = None
+    if exit_gate and body_exit and cfg.gate.body_tracking:  # two-camera exit: room loses a named body + door sees someone go
+        from edge.bodyexit import ExitFusion
+
+        _xg = exit_gate
+        fusion = ExitFusion(lambda sid, payload: _xg.report_out(sid, payload, t=time.monotonic()))
+
     door_bodies = None
     if cfg.gate.body_tracking:
         from edge.bodyexit import DoorBodyWatcher
 
-        door_bodies = DoorBodyWatcher(gate.report_unknown_entry, cfg.gate.body_min_s)
+        door_bodies = DoorBodyWatcher(gate.report_unknown_entry, cfg.gate.body_min_s,
+                                      on_leave=fusion.door_leaving if fusion else None,
+                                      leaving_shrinks=cfg.gate.leaving_shrinks)
 
     from edge.roommap import room_people
 
@@ -325,6 +334,10 @@ def main(argv: list[str] | None = None) -> int:
                     boxes, ids = bodies_with_ids(yolo, frame, "room")
                     # all bodies, not only seated ones: people walking to the door leave the seat area
                     body_exit.update(boxes, frame.shape[1], frame.shape[0], time.monotonic(), ids)
+                    if body_exit.vanished:
+                        lost, body_exit.vanished = body_exit.vanished, []
+                        if fusion:
+                            fusion.room_vanished(lost)
                 else:
                     boxes, ids = yolo(frame), None
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
@@ -366,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
             if k % max(1, cfg.exit.process_every_nth):
                 continue
             frame = rotate_frame(frame, cfg.inside.rotate)
-            faces = detect(frame)
+            faces = detect(frame, cfg.exit.tiles)
             now = time.monotonic()
             pipeline.process(faces, frame.shape[1], frame.shape[0], now)
             if body_exit:

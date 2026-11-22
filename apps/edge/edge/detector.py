@@ -51,7 +51,25 @@ class InsightFaceDetector:
         used = {p for m in self._app.models.values() for p in m.session.get_providers()}
         self.device = "GPU" if "CUDAExecutionProvider" in used else "CPU"
 
-    def __call__(self, frame: np.ndarray) -> list[FaceDet]:
+    def __call__(self, frame: np.ndarray, tiles: int = 1) -> list[FaceDet]:
+        """tiles > 1: search an n x n grid of overlapping tiles of the full-resolution frame, so small faces far away
+        (back row) are found at more detail than when the whole frame is shrunk to det_size."""
+        if tiles <= 1:
+            return self._detect(frame)
+        h, w = frame.shape[:2]
+        th, tw = h // tiles, w // tiles
+        oy, ox = th // 6, tw // 6  # overlap: a face on a tile border is still whole in one tile
+        found: list[FaceDet] = []
+        for r in range(tiles):
+            for c in range(tiles):
+                y0, x0 = max(0, r * th - oy), max(0, c * tw - ox)
+                y1, x1 = min(h, (r + 1) * th + oy), min(w, (c + 1) * tw + ox)
+                for f in self._detect(frame[y0:y1, x0:x1]):
+                    b = f.box
+                    found.append(FaceDet((b[0] + x0, b[1] + y0, b[2] + x0, b[3] + y0), f.det_score, f.embedding, f.live_score))
+        return merge_faces(found)
+
+    def _detect(self, frame: np.ndarray) -> list[FaceDet]:
         out: list[FaceDet] = []
         for f in self._app.get(frame):
             emb = getattr(f, "normed_embedding", None)
@@ -61,3 +79,14 @@ class InsightFaceDetector:
             out.append(FaceDet((x1, y1, x2, y2), float(f.det_score), None if emb is None else np.asarray(emb, dtype=np.float32),
                                None if live is None else float(live)))
         return out
+
+
+def merge_faces(faces: list[FaceDet], iou_max: float = 0.4) -> list[FaceDet]:
+    """Faces found twice in overlapping tiles: keep the higher detection score."""
+    from edge.geometry import iou
+
+    kept: list[FaceDet] = []
+    for f in sorted(faces, key=lambda x: -x.det_score):
+        if all(iou(f.box, k.box) < iou_max for k in kept):
+            kept.append(f)
+    return kept

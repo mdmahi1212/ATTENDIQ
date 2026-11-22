@@ -52,6 +52,9 @@ class GateYaml(BaseModel):
     # unknown entry (LED red). Uses the inside camera's YOLO weights.
     body_tracking: bool = True
     body_min_s: float = 1.0
+    # Phone 1 looks along the corridor at people coming in: someone walking OUT gets smaller. False if it looks at
+    # the doorway from outside (people walking out get bigger).
+    leaving_shrinks: bool = True
     # Photo / screen attack check at the door (InsightFace liveness addon). Tune with the live_score in the logs.
     liveness: bool = True
     live_threshold: float = 0.3
@@ -110,6 +113,8 @@ class ExitYaml(BaseModel):
     # Also follow BODIES (YOLO) across the exit line: a student whose face was seen in class is reported OUT even
     # when the face is turned away at the door; an unseen face is reported as "someone left" (needs inside.enabled).
     body_tracking: bool = True
+    # Room camera face search on an n x n grid of tiles (2 = 4 tiles): finds back-row faces. 1 = off.
+    tiles: int = 2
 
     def to_gate_config(self, gate: GateYaml) -> GateConfig:
         # GateConfig.in_side names the ROOM side; for an exit-only camera the room is opposite the door side.

@@ -18,7 +18,7 @@ import { endSession, sendVerifyRequest, startRecheck, writeClassSummary } from "
 import { LiveRefresh } from "./live-refresh";
 import { ManualMark } from "./manual-mark";
 
-const METHOD_LABEL: Record<string, string> = { gate: "gate camera", self_verify: "self-verify", recheck: "recheck", manual: "manual", appeal: "appeal" };
+const METHOD_LABEL: Record<string, string> = { gate: "gate camera", self_verify: "self-verify", recheck: "recheck", manual: "manual", appeal: "appeal", room: "room camera" };
 
 export default async function LiveSessionPage({ params }: PageProps<"/sessions/[id]">) {
   await requireRole("professor", "admin");

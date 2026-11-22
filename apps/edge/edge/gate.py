@@ -131,6 +131,8 @@ class GatePipeline:
                 payload["student_id"] = d.student_id
                 self.memory.exit(d.student_id)  # type: ignore[arg-type]
             self._event(EventType.GATE_PERSON_OUT, payload)
+            if self._feedback:
+                self._feedback("left")
 
     def _decide(self, tr: Track) -> Decision:
         tr.decided = True

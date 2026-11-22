@@ -103,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
         log.info("event %s %s", env_.event_type, json.dumps(env_.payload))
 
     def feedback(result: str) -> None:
+        if liveview:  # simulated ESP32 LED on the live view (there is no board)
+            liveview.led(result)
+        if result == "left":
+            return  # the door LED firmware only knows ok / unknown
         if client and connected.is_set():
             client.publish(topics.feedback(room), json.dumps({"result": result}), qos=0)
 
@@ -121,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     # Exit recognition on the inside camera: same gallery and the same "who is inside" memory as the gate.
     exit_gate: GatePipeline | None = None
     if cfg.exit.enabled:
-        exit_gate = GatePipeline(cfg.exit.to_gate_config(cfg.gate), gallery, device_id, emit, None, clock=server_now,
+        exit_gate = GatePipeline(cfg.exit.to_gate_config(cfg.gate), gallery, device_id, emit, feedback, clock=server_now,
                                  memory=gate.memory)
     session_lock = threading.Lock()
 

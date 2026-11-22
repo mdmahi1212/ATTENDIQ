@@ -356,3 +356,24 @@ def test_exit_camera_in_presence_mode_marks_any_recognised_face_as_out() -> None
     pipe.start(uuid.uuid4(), GALLERY)
     walk(pipe, lambda i: near(A, 0.7, 100 + i), [240] * 10)  # stands in front of the way-out camera
     assert types(events) == ["GATE_PERSON_OUT"] and events[0].payload["student_id"] == "stu-a"
+
+
+# ---------------------------------------------------------------- simulated ESP32 door LED (live view)
+def test_exit_lights_the_led_amber_and_the_live_view_shows_it() -> None:
+    from edge.config import ExitYaml, GateYaml
+    from edge.liveview import LiveView
+
+    fb: list[str] = []
+    cfg = ExitYaml(enabled=True, line_a=(0.3, 0.0), line_b=(0.3, 1.0), out_side=1).to_gate_config(GateYaml())
+    pipe = GatePipeline(cfg, Gallery(), DEV, lambda e: None, fb.append, clock=lambda: datetime(2026, 11, 22, 2, 0, tzinfo=UTC))
+    pipe.start(uuid.uuid4(), GALLERY)
+    walk_x(pipe, lambda i: near(B, 0.7, 100 + i), [400, 340, 280, 220, 160, 100])
+    assert fb == ["left"]
+
+    view = LiveView()
+    assert view.led_state()["color"] == "off"
+    for result, color in (("ok", "green"), ("unknown", "red"), ("left", "amber")):
+        view.led(result)
+        assert view.led_state()["color"] == color
+    view._led = ("ok", view._led[1] - 2.0)  # 2 s later: the firmware turns the LED off after 1.5 s
+    assert view.led_state() == {"color": "off", "last": "ok", "seconds_ago": 2.0}

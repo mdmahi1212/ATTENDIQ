@@ -7,6 +7,7 @@ Inside stream: a box per person YOLO found and the count. Frames live in RAM onl
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -82,6 +83,19 @@ class LiveView:
         self._jpeg: dict[str, bytes] = {}
         self._last: dict[str, float] = {}
         self._lock = threading.Lock()
+        self._led: tuple[str, float] = ("off", time.monotonic())  # simulated ESP32 door LED: last result + when (monotonic)
+
+    def led(self, result: str) -> None:
+        """Simulated ESP32 door LED: ok = green, unknown = red, left = amber (lit for LED_ON_S like the firmware)."""
+        with self._lock:
+            self._led = (result, time.monotonic())
+
+    def led_state(self) -> dict[str, object]:
+        with self._lock:
+            result, at = self._led
+        age = time.monotonic() - at
+        lit = result != "off" and age < LED_ON_S
+        return {"color": LED_COLORS.get(result, "off") if lit else "off", "last": result, "seconds_ago": round(age, 1)}
 
     def due(self, name: str) -> bool:
         """True when this stream should get a new frame (keeps drawing + encoding at ~fps)."""
@@ -123,6 +137,15 @@ class LiveView:
                     self.end_headers()
                     self.wfile.write(body)
                     return
+                if self.path == "/led.json":
+                    body = json.dumps(view.led_state()).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 name = self.path.strip("/").removesuffix(".mjpg")
                 if name not in ("gate", "inside", "exit"):
                     self.send_error(404)
@@ -146,6 +169,10 @@ class LiveView:
         log.info("live view: http://%s:%d", self.host, self.port)
 
 
+LED_ON_S = 1.5  # firmware/esp32-door-led keeps the LED on for 1.5 s
+LED_COLORS = {"ok": "green", "unknown": "red", "left": "amber"}
+
+
 def _waiting_jpeg() -> bytes:
     import cv2
 
@@ -160,6 +187,10 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>AttendIQ live 
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#111;color:#eee}
 h1{font-size:18px;font-weight:500;margin:12px 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:12px;padding:0 16px 16px}
 figure{margin:0}img{width:100%;border-radius:8px;background:#222}figcaption{font-size:13px;color:#aaa;margin:6px 2px}
+.box{display:flex;gap:16px;align-items:center;background:#1b1b1b;border-radius:8px;padding:20px;min-height:120px}
+.bulb{width:72px;height:72px;border-radius:50%;background:#333;box-shadow:inset 0 0 12px #000;transition:all .15s}
+.bulb.green{background:#2ecc40;box-shadow:0 0 36px 10px #2ecc40aa}.bulb.red{background:#ff3b30;box-shadow:0 0 36px 10px #ff3b30aa}
+.bulb.amber{background:#ffb000;box-shadow:0 0 36px 10px #ffb000aa}
 .k{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 12px}
 </style></head><body>
 <h1>AttendIQ — live AI view (local only, nothing is stored)
@@ -171,4 +202,13 @@ figure{margin:0}img{width:100%;border-radius:8px;background:#222}figcaption{font
 <figure><img src="/gate.mjpg" alt="door camera"><figcaption>Door camera: face detection + recognition (InsightFace)</figcaption></figure>
 <figure><img src="/inside.mjpg" alt="room camera"><figcaption>Room camera: people detection + count (YOLO)</figcaption></figure>
 <figure><img src="/exit.mjpg" alt="way-out camera"><figcaption>Way-out camera: recognising people who leave (if enabled)</figcaption></figure>
-</div></body></html>"""
+<figure class="led"><div class="box"><div id="led" class="bulb"></div><div><b>ESP32 door LED</b> (simulated, no board)<br>
+<span id="ledtxt">waiting</span></div></div><figcaption>Green = recognised at the door · Red = unknown face · Amber = someone left</figcaption></figure>
+</div>
+<script>
+const led=document.getElementById("led"),txt=document.getElementById("ledtxt");
+const say={ok:"recognised - door LED green",unknown:"unknown face - door LED red",left:"someone left - LED amber",off:"waiting"};
+async function poll(){try{const r=await(await fetch("/led.json",{cache:"no-store"})).json();
+led.className="bulb "+r.color;txt.textContent=r.last==="off"?"waiting":say[r.last]+" ("+r.seconds_ago+" s ago)";}catch(e){}
+setTimeout(poll,250);}poll();
+</script></body></html>"""

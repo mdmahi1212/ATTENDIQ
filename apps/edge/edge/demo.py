@@ -3,7 +3,7 @@
 Put the two recordings in the repo's demo/ folder:
   demo/door.mp4  phone 1, outside the door (people coming in)
   demo/room.mp4  phone 2, inside the room (the seats and the way out)
-(.mov / .m4v / .avi / .mkv work too.) Then double-click demo/run-quick-test.bat or demo/run-full-demo.bat.
+(.mov / .m4v / .avi / .mkv work too.) Then double-click demo/START-DEMO.bat.
 
 This builds a demo camera config from your config.yaml + demo/settings.yaml (your config.yaml is not changed),
 opens the live view, starts a real class with the videos, and saves the log + final table in demo/logs/.

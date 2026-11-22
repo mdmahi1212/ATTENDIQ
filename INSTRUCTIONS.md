@@ -125,6 +125,8 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
    - an **unknown face sitting in the room** → the professor gets "Unknown person in the room" (no picture stored).
    - **one phone per student**: the first "Verify now" registers that phone; another phone is refused.
      New phone? Admin → People → **Reset phone** on that student.
+4. After a class: class page → **Class summary → Write summary** (who attended, left, needs review, at-risk).
+   Written by Claude when `ANTHROPIC_API_KEY` is set in Vercel, otherwise a plain version.
 3. Real classes start by themselves from the timetable. For a live demo: **Admin → Demo → IOT401-01 →**
    5 / 10 / 15 min (short clock) or **Full class** (normal rules).
 4. To stop everything: close the four windows (broker, face-api, ingest, edge).
@@ -159,6 +161,7 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 ---
 
 ## 5. Later
+- Optional: add `ANTHROPIC_API_KEY` in Vercel → attendiq → Settings → Environment Variables (Claude-written class summaries; paid per use).
 - After the presentation: delete the videos from `C:\videos` (they show faces).
 - Rotate the Supabase secret key.
 - Sync the Windows clock (Settings → Time → Sync now).

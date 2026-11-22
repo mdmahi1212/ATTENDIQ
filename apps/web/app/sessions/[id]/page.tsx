@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ageSeconds, fmtSeoul } from "@/lib/time";
 import { REASON_TEXT, type VerifyReason } from "@/lib/verify/decision";
 import { policyNum } from "@/lib/verify/server";
-import { endSession, sendVerifyRequest, startRecheck } from "./actions";
+import { endSession, sendVerifyRequest, startRecheck, writeClassSummary } from "./actions";
 import { LiveRefresh } from "./live-refresh";
 import { ManualMark } from "./manual-mark";
 
@@ -26,7 +26,7 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
   const supabase = await createClient();
   const { data: session } = await supabase
     .from("class_sessions")
-    .select("id, state, starts_at, ends_at, staff_count, policy, gate_offline_seconds, is_simulation, room_id, sections(section_no, courses(code, title)), rooms(code)")
+    .select("id, state, starts_at, ends_at, staff_count, policy, gate_offline_seconds, is_simulation, room_id, summary, summary_at, sections(section_no, courses(code, title)), rooms(code)")
     .eq("id", id)
     .maybeSingle();
   if (!session) notFound(); // RLS: only staff of the section (or admin) can read it
@@ -110,6 +110,32 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
           </Card>
         ))}
       </div>
+
+      {session.state === "ended" && (
+        <Card className="mb-4" data-testid="class-summary">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Class summary</CardTitle>
+            <RowAction
+              action={writeClassSummary}
+              fields={{ session_id: session.id }}
+              label={session.summary ? "Write again" : "Write summary"}
+              variant="outline"
+            />
+          </CardHeader>
+          <CardContent>
+            {session.summary ? (
+              <>
+                <p className="whitespace-pre-line text-sm">{session.summary}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Written {session.summary_at ? fmtSeoul(session.summary_at, "MM-dd HH:mm") : ""} from this class&apos;s records (names, statuses, counts only).
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">A short summary of this class: who attended, who left, who to follow up with.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {banner && (
         <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

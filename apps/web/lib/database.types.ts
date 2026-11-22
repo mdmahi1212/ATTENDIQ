@@ -311,6 +311,8 @@ export type Database = {
           staff_count: number
           started_at: string | null
           starts_at: string
+          summary: string | null
+          summary_at: string | null
           state: Database["public"]["Enums"]["session_state"]
         }
         Insert: {
@@ -335,6 +337,8 @@ export type Database = {
           staff_count?: number
           started_at?: string | null
           starts_at: string
+          summary?: string | null
+          summary_at?: string | null
           state?: Database["public"]["Enums"]["session_state"]
         }
         Update: {
@@ -359,6 +363,8 @@ export type Database = {
           staff_count?: number
           started_at?: string | null
           starts_at?: string
+          summary?: string | null
+          summary_at?: string | null
           state?: Database["public"]["Enums"]["session_state"]
         }
         Relationships: [

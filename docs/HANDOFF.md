@@ -104,3 +104,7 @@ Progress:
 - 2026-11-23 #4 DONE: OCCUPANCY_UPDATED payload.people [{x,y feet 0..1, student_id?}] (edge/roommap.py, name from body
   tracker identity); live dashboard 'Room map' card (latest occupancy edge_event via admin client after requireRole).
   Body-based time-in-class NOT built (door-event time stays). Edge 66, web 138.
+- 2026-11-23 #5 DONE: class_sessions.summary/summary_at (migration 20261122194558, applied); lib/class-summary(.ts|-ai.ts),
+  lib/class-facts.ts; class page 'Class summary -> Write summary' (ended classes). Claude claude-opus-5-5, effort low,
+  fallbacks "default" (beta server-side-fallback-2026-07-01) when ANTHROPIC_API_KEY set; else template. Browser-checked
+  template path on session 95d46ca6 (summary saved there). Claude path NOT run (no key). @anthropic-ai/sdk 1.12.0.

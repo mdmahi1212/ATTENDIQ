@@ -76,7 +76,7 @@ One-time setup:
   (or set it in Vercel → Project → Settings → Environment Variables). Set it back to `false` after presenting.
 - `apps/edge/config.yaml`: `exit.enabled: true`, `exit.mode: presence`; `inside.enabled: false`;
   `gate.rotate: 0` and `inside.rotate: 0` for landscape files (the live phone rotations do NOT apply to files).
-  Optional: `liveview.enabled: true` to show the boxes and names at http://127.0.0.1:8090.
+  `liveview:` `enabled: true` to show the boxes, names and the **virtual door LED** at http://127.0.0.1:8090.
 - Copy the files to `apps/edge/samples/` (gitignored: faces).
 
 Good to know:
@@ -92,6 +92,18 @@ Good to know:
 
 Re-run: just run the command again (each run is a new class with an empty "who is inside" memory). Clean up old
 runs with `scripts\reset-demo.ps1`.
+
+## Virtual door LED (no ESP32 needed)
+
+http://127.0.0.1:8090 shows the camera views and, beside them, a simulated ESP32 door LED with an event log.
+It lights for 1.5 s, like `firmware/esp32-door-led`:
+- **green** + initials: the student was recognised and the attendance was recorded (`GATE_ENTRY_RECOGNISED`)
+- **red**: unknown person at the door (`GATE_ENTRY_UNKNOWN`)
+- **amber** + initials: a recognised student left the room (`GATE_PERSON_OUT`)
+
+It is driven by the same events the edge sends to the server, so it also works with `--direct` (no MQTT).
+The gallery holds initials only (privacy), so the LED shows initials. Screen-record this tab next to the
+professor's live dashboard for the presentation video.
 
 ## Optional: phone verification in the same video
 

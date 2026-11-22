@@ -422,3 +422,27 @@ def test_result_table_lists_every_student() -> None:
         {"name": "Fahim", "status": "absent", "flags": ["left_no_return"], "note": "left at 10:02 and did not come back"},
     ]})
     assert "Mahi" in out and "left_no_return" in out and "did not come back" in out and "door: 1" in out
+
+
+# ---------------------------------------------------------------- virtual door LED (live view)
+def test_virtual_led_follows_door_events() -> None:
+    from edge.liveview import LiveView, led_for_event
+
+    g = Gallery()
+    g.load(GALLERY)
+    sid = next(iter(g.students))
+
+    def ev(et: EventType, **payload: object) -> Envelope:
+        return Envelope(event_type=et, source_device_id=DEV, session_id=uuid.uuid4(), payload=payload)
+
+    green = led_for_event(ev(EventType.GATE_ENTRY_RECOGNISED, student_id=sid), g)
+    assert green == ("green", f"{g.students[sid]}: attendance recorded")
+    assert led_for_event(ev(EventType.GATE_ENTRY_UNKNOWN), g) == ("red", "unknown person at the door")
+    assert led_for_event(ev(EventType.GATE_PERSON_OUT, student_id=sid), g)[0] == "amber"  # type: ignore[index]
+    assert led_for_event(ev(EventType.GATE_PERSON_OUT), g) is None  # unrecognised leaver: LED stays off
+    assert led_for_event(ev(EventType.GATE_PERSON_IN), g) is None
+    lv = LiveView()
+    for i in range(12):
+        lv.led("green", f"s{i}")
+    events = lv.led_state()["events"]
+    assert len(events) == 10 and events[-1]["text"] == "s11" and events[-1]["seq"] == 12  # type: ignore[index]

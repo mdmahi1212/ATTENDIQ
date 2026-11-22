@@ -102,10 +102,18 @@ def main(argv: list[str] | None = None) -> int:
             return info.mid if info.rc == 0 else None
 
     publisher = Publisher(outbox, send)
+    liveview: Any = None  # set below when the live view is enabled (emit lights its virtual door LED)
+    gallery = Gallery()
 
     def emit(env_: Envelope) -> None:
         publisher.publish(topics.for_event(room, env_.event_type), env_)
         log.info("event %s %s", env_.event_type, json.dumps(env_.payload))
+        if liveview:
+            from edge.liveview import led_for_event
+
+            lit = led_for_event(env_, gallery)
+            if lit:
+                liveview.led(*lit)
 
     def feedback(result: str) -> None:
         if client and connected.is_set():
@@ -115,8 +123,6 @@ def main(argv: list[str] | None = None) -> int:
         """Local clock corrected by the measured offset to the server (a wrong laptop clock must not change statuses)."""
         return datetime.now(UTC) + timedelta(seconds=api.clock_offset)
 
-    gallery = Gallery()
-    liveview = None
     if cfg.liveview.enabled:
         from edge.liveview import LiveView
 

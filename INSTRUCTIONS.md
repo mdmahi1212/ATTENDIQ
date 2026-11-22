@@ -108,6 +108,8 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
    - opens a window each for the broker, the face API, ingest and the edge (face + person models on the GPU),
    - opens the live camera view (http://127.0.0.1:8090) and the website. The live view also shows the
      **ESP32 door LED** on screen (we have no board): green = recognised, red = unknown face, amber = someone left.
+   - The room camera follows **faces and bodies**: if a student walks out with their face turned away, the system
+     still knows who it was (from their face earlier in class); if it never saw the face, it reports "someone left".
    Double-clicking it again is safe: parts that already run are reused.
 3. Real classes start by themselves from the timetable. For a live demo: **Admin → Demo → IOT401-01 →**
    5 / 10 / 15 min (short clock) or **Full class** (normal rules).

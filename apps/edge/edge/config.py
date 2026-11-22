@@ -96,6 +96,9 @@ class ExitYaml(BaseModel):
     out_side: int = 1
     min_travel_px: float = 25
     min_face_px: int = 50
+    # Also follow BODIES (YOLO) across the exit line: a student whose face was seen in class is reported OUT even
+    # when the face is turned away at the door; an unseen face is reported as "someone left" (needs inside.enabled).
+    body_tracking: bool = True
 
     def to_gate_config(self, gate: GateYaml) -> GateConfig:
         # GateConfig.in_side names the ROOM side; for an exit-only camera the room is opposite the door side.

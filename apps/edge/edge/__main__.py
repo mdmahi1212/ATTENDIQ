@@ -127,6 +127,14 @@ def main(argv: list[str] | None = None) -> int:
     if cfg.exit.enabled:
         exit_gate = GatePipeline(cfg.exit.to_gate_config(cfg.gate), gallery, device_id, emit, feedback, clock=server_now,
                                  memory=gate.memory)
+    body_exit = None
+    if exit_gate and cfg.exit.body_tracking and cfg.exit.mode == "line" and cfg.inside.enabled:
+        from edge.bodyexit import BodyExitTracker
+
+        _eg = exit_gate
+        body_exit = BodyExitTracker(cfg.exit.line_a, cfg.exit.line_b, cfg.exit.out_side, gallery, gate.memory,
+                                    exit_gate.cfg.thresholds,
+                                    lambda sid, payload: _eg.report_out(sid, payload, t=time.monotonic()))
     session_lock = threading.Lock()
 
     def set_session(session_id: str | None, reason: str) -> None:
@@ -161,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
             if exit_gate:
                 exit_gate.session_id = gate.session_id  # gallery + memory are shared and were just reset by gate.start
                 exit_gate.tracker.clear()
+            if body_exit:
+                body_exit.reset()
             log.info("session %s (%s): gallery %d students", session_id, reason, len(gallery))
 
     if client:
@@ -231,6 +241,8 @@ def main(argv: list[str] | None = None) -> int:
         next_pub = next_count = 0.0
         sample = None
         period = min(cfg.inside.interval_s, liveview.period) if liveview else cfg.inside.interval_s
+        if body_exit:
+            period = min(period, 0.2)  # follow walking bodies: ~5 frames per second at least
         log.info("inside camera ready (%s), roi %s, %s on %s", env.inside_camera_source, cfg.inside.roi,
                  Path(env.yolo_weights).name, "GPU" if yolo.device != "cpu" else "CPU")
         while not stop.is_set():
@@ -243,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
                 frame = rotate_frame(frame, cfg.inside.rotate)
                 boxes = yolo(frame)
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
+                if body_exit:  # all bodies, not only seated ones: people walking to the door leave the seat area
+                    body_exit.update(boxes, frame.shape[1], frame.shape[0], time.monotonic())
                 if t >= next_count or sample is None:
                     next_count = t + cfg.inside.interval_s
                     sample = counter.add(len(kept), t)
@@ -279,7 +293,10 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             frame = rotate_frame(frame, cfg.inside.rotate)
             faces = detect(frame)
-            pipeline.process(faces, frame.shape[1], frame.shape[0], time.monotonic())
+            now = time.monotonic()
+            pipeline.process(faces, frame.shape[1], frame.shape[0], now)
+            if body_exit:
+                body_exit.faces(faces, now)
             if liveview and liveview.due("exit"):
                 from edge.liveview import draw_faces
 

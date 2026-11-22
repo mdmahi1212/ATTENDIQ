@@ -65,3 +65,8 @@ Progress:
   /api/edge/v1/sessions/demo-class (edge key; section in the device's room; 5/10/15 min; lib/demo-class.ts shared with
   Admin -> Demo), opens live view + /sessions/<id>/dashboard, runs edge --direct --demo. NOT yet run end to end
   (route needs a push; a run starts a real class).
+- 2026-11-23 START-CLASS.bat (scripts/start-live.ps1): checks phones, starts broker/face-api/ingest/edge (reuses running
+  ones), opens live view + site. Ran it: all 4 up, models on GPU. Live view: simulated ESP32 LED (/led.json).
+  Body exit (edge/bodyexit.py, exit.body_tracking true, line mode + inside enabled): YOLO body tracks carry the identity
+  of faces seen inside them (>=2 sightings); body crossing the exit line -> GATE_PERSON_OUT (student or unknown);
+  GatePipeline.report_out dedupes unknown OUT within 3 s of another OUT. 49 edge tests. NOT verified with real people.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -66,6 +67,8 @@ class GatePipeline:
         self.session_id: uuid.UUID | None = None
         self.simulation = False
         self.stats = {"frames": 0, "faces": 0, "in": 0, "out": 0, "recognised": 0, "unknown": 0}
+        self._last_out_at = -1e9  # monotonic time of the last reported OUT (dedupe face + body trackers)
+        self._t: float | None = None  # time of the frame being processed
 
     # ------------------------------------------------------------ session control
     def start(self, session_id: uuid.UUID, gallery_data: dict[str, Any]) -> None:
@@ -88,6 +91,7 @@ class GatePipeline:
     # ------------------------------------------------------------ frames
     def process(self, faces: list[FaceDet], frame_w: int, frame_h: int, t: float) -> None:
         self.stats["frames"] += 1
+        self._t = t
         if self.session_id is None:
             return
         dets = []
@@ -126,13 +130,24 @@ class GatePipeline:
         else:
             self.stats["out"] += 1
             d = decide([e for _, e in tr.embeddings], self.gallery, self.cfg.thresholds) if tr.embeddings else None
-            payload: dict[str, Any] = {"track_id": tr.track_id}
-            if d and d.recognised:
-                payload["student_id"] = d.student_id
-                self.memory.exit(d.student_id)  # type: ignore[arg-type]
-            self._event(EventType.GATE_PERSON_OUT, payload)
-            if self._feedback:
-                self._feedback("left")
+            self.report_out(d.student_id if d and d.recognised else None, {"track_id": tr.track_id})
+
+    def report_out(self, student_id: str | None, payload: dict[str, Any], t: float | None = None,
+                   dedupe_unknown_s: float = 3.0) -> bool:
+        """GATE_PERSON_OUT (face crossing, or a body crossing from edge.bodyexit). An unidentified OUT right after
+        another OUT is the same person seen by both trackers, so it is dropped. Returns True when reported."""
+        now = t if t is not None else self._t if self._t is not None else time.monotonic()
+        if student_id is None and now - self._last_out_at < dedupe_unknown_s:
+            return False
+        self._last_out_at = now
+        payload = dict(payload)
+        if student_id:
+            payload["student_id"] = student_id
+            self.memory.exit(student_id)
+        self._event(EventType.GATE_PERSON_OUT, payload)
+        if self._feedback:
+            self._feedback("left")
+        return True
 
     def _decide(self, tr: Track) -> Decision:
         tr.decided = True

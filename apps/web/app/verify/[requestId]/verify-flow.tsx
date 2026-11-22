@@ -9,7 +9,7 @@ import { extractFeatures, grabJpeg, loadLandmarker } from "@/lib/face/landmarker
 import { CHALLENGE_TEXT, LivenessSession, pickChallenges, type Challenge } from "@/lib/face/liveness";
 import { REASON_TEXT, type VerifyReason } from "@/lib/verify/decision";
 
-type Step = "location" | "qr" | "face" | "submitting" | "result";
+type Step = "location" | "seat" | "qr" | "face" | "submitting" | "result";
 type Fix = { lat: number; lng: number; accuracy: number } | null;
 type Result = { pass: boolean; status?: string | null; reasons: VerifyReason[]; attemptsLeft: number; error?: string };
 
@@ -28,6 +28,7 @@ export function VerifyFlow(props: {
   const [fix, setFix] = useState<Fix>(null);
   const [gpsMsg, setGpsMsg] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  const [seat, setSeat] = useState<{ x: number; y: number } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [attemptsLeft, setAttemptsLeft] = useState(props.attemptsLeft);
   const [manualSent, setManualSent] = useState(false);
@@ -73,6 +74,7 @@ export function VerifyFlow(props: {
           lng: fix?.lng ?? null,
           accuracy: fix?.accuracy ?? null,
           qr_token: qr,
+          seat,
           device_id: deviceId(),
         }),
       );
@@ -93,7 +95,7 @@ export function VerifyFlow(props: {
       }
       setStep("result");
     },
-    [attemptsLeft, fix, props.requestId, qr],
+    [attemptsLeft, fix, props.requestId, qr, seat],
   );
 
   const requestManual = async () => {
@@ -125,11 +127,26 @@ export function VerifyFlow(props: {
             <Button onClick={locate} variant={fix ? "outline" : "default"}>
               {fix ? "Try again" : "Share my location"}
             </Button>
-            <Button onClick={() => setStep("qr")} variant={fix ? "default" : "outline"} disabled={closed}>
+            <Button onClick={() => setStep("seat")} variant={fix ? "default" : "outline"} disabled={closed}>
               Next
             </Button>
           </div>
         </section>
+      )}
+
+      {step === "seat" && (
+        <SeatStep
+          requestId={props.requestId}
+          onSeat={(p) => {
+            setSeat(p);
+            setQr(null);
+            setStep("face");
+          }}
+          onQr={() => {
+            setSeat(null);
+            setStep("qr");
+          }}
+        />
       )}
 
       {step === "qr" && (
@@ -167,7 +184,8 @@ export function VerifyFlow(props: {
                     onClick={() => {
                       setResult(null);
                       setQr(null);
-                      setStep("qr");
+                      setSeat(null);
+                      setStep("seat");
                     }}
                   >
                     Try again
@@ -237,7 +255,7 @@ function QrStep({ requireQr, onToken, onSkip }: { requireQr: boolean; onToken: (
 
   return (
     <section className="space-y-2 rounded-lg border p-4 text-sm">
-      <h2 className="font-semibold">2. Room code</h2>
+      <h2 className="font-semibold">2. Room code (instead of the seat)</h2>
       <p>{msg}</p>
       <div id="qr-reader" className="overflow-hidden rounded-lg" />
       {!requireQr && (
@@ -354,6 +372,59 @@ function FaceStep({ onDone }: { onDone: (frame: Blob, l: { challenges: Challenge
       </div>
       {phase === "error" && <p className="text-destructive">{text}</p>}
       {phase !== "running" && <Button onClick={start}>{phase === "error" ? "Try again" : "Start face check"}</Button>}
+    </section>
+  );
+}
+
+
+/** "Tap your seat": dots = people the room camera sees right now (positions only). No dots -> scan the QR. */
+function SeatStep({ requestId, onSeat, onQr }: { requestId: string; onSeat: (p: { x: number; y: number }) => void; onQr: () => void }) {
+  const [dots, setDots] = useState<{ x: number; y: number; taken: boolean }[] | null>(null);
+  useEffect(() => {
+    let stop = false;
+    const load = async () => {
+      const res = await fetch(`/api/verify/${requestId}/seats`, { cache: "no-store" }).catch(() => null);
+      const body = (await res?.json().catch(() => null)) as { dots?: { x: number; y: number; taken: boolean }[] } | null;
+      if (!stop) setDots(body?.dots ?? []);
+    };
+    load();
+    const t = setInterval(load, 10_000); // the room camera sends positions every ~10 s
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [requestId]);
+
+  return (
+    <section className="space-y-3 rounded-lg border p-4 text-sm" data-testid="seat-step">
+      <h2 className="font-semibold">2. Tap your seat</h2>
+      {dots === null ? (
+        <p className="text-muted-foreground">Loading the room…</p>
+      ) : dots.length === 0 ? (
+        <p className="text-muted-foreground">The room camera does not see anyone right now. Scan the room QR instead.</p>
+      ) : (
+        <>
+          <p className="text-muted-foreground">Each dot is a person the room camera sees (the room from the front). Tap the one that is you.</p>
+          <svg viewBox="0 0 160 90" className="w-full rounded-lg border bg-muted/40" role="img" aria-label="People in the room">
+            {dots.map((d, i) => (
+              <circle
+                key={i}
+                cx={d.x * 160}
+                cy={Math.min(85, d.y * 90)}
+                r="5"
+                className={d.taken ? "fill-slate-300" : "cursor-pointer fill-primary"}
+                onClick={d.taken ? undefined : () => onSeat({ x: d.x, y: d.y })}
+              >
+                <title>{d.taken ? "someone else" : "tap if this is you"}</title>
+              </circle>
+            ))}
+          </svg>
+          <p className="text-xs text-muted-foreground">Grey dots are people the camera already knows.</p>
+        </>
+      )}
+      <Button variant="outline" onClick={onQr}>
+        Scan the room QR instead
+      </Button>
     </section>
   );
 }

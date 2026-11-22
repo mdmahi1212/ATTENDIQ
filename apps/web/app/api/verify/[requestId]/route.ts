@@ -9,6 +9,8 @@ import { decideVerification, MAX_ATTEMPTS, type VerifyReason } from "@/lib/verif
 import { checkStudentDevice } from "@/lib/verify/device";
 import { deviceLabel } from "@/lib/device-id";
 import { verifyQrToken } from "@/lib/verify/qr";
+import { latestRoomPeople } from "@/lib/verify/room-people";
+import { seatMatches } from "@/lib/verify/seat";
 import { loadRequestContext, policyNum, windowOpen } from "@/lib/verify/server";
 
 export const runtime = "nodejs";
@@ -24,6 +26,7 @@ const metaSchema = z.object({
   lng: z.number().min(-180).max(180).nullable().optional(),
   accuracy: z.number().min(0).max(100_000).nullable().optional(),
   qr_token: z.string().max(200).nullable().optional(),
+  seat: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable().optional(), // tapped seat
   device_id: z.guid().optional(), // rule F: this phone's id (missing = an old app version: refused below)
 });
 
@@ -106,6 +109,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
     qrReason = check.ok ? null : check.reason;
   }
 
+  // Seat (room proof without a QR): the room camera must see a person where the student tapped
+  let seatOk: boolean | null = null;
+  if (meta.data.seat) {
+    const people = await latestRoomPeople(admin, rc.session.id, now);
+    seatOk = people ? seatMatches(people, meta.data.seat, user.id) : false;
+  }
+
   // GPS (supporting signal)
   const { lat, lng, accuracy } = meta.data;
   let gpsInside: boolean | null = null;
@@ -121,6 +131,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
     passiveLive,
     requirePassiveLive: requireLiveness(),
     qrOk,
+    seatOk,
     requireQr: rc.requireQr,
     gpsInside,
     gpsAccuracyM: accuracy ?? null,
@@ -142,7 +153,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
       gps_ok: decision.gpsOk,
       qr_ok: qrOk,
       result: decision.pass ? "pass" : "fail",
-      reason: [...decision.reasons, ...(qrReason ? [`qr:${qrReason}`] : [])].join(",") || null,
+      reason: [...decision.reasons, ...(qrReason ? [`qr:${qrReason}`] : []), ...(seatOk !== null ? [`seat:${seatOk ? "ok" : "no"}`] : [])].join(",") || null,
     })
     .select("id")
     .single();

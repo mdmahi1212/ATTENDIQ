@@ -85,3 +85,25 @@ describe("self-verify decision", () => {
     expect(decideVerification({ ...base, faceScore: 0.5 }).pass).toBe(true);
   });
 });
+
+describe("seat proof (no QR needed)", () => {
+  it("passes with face + liveness + a seat the room camera confirms", async () => {
+    const { decideVerification } = await import("@/lib/verify/decision");
+    const base = { faceScore: 0.8, faceThreshold: 0.5, livenessOk: true, passiveLive: true, requirePassiveLive: true,
+      requireQr: true, gpsInside: null, gpsAccuracyM: null, gpsMaxAccuracyM: 40 };
+    expect(decideVerification({ ...base, qrOk: null, seatOk: true }).pass).toBe(true);
+    expect(decideVerification({ ...base, qrOk: null, seatOk: false }).reasons).toEqual(["seat_not_found"]);
+    expect(decideVerification({ ...base, qrOk: null, seatOk: null }).reasons).toEqual(["qr_missing"]);
+    expect(decideVerification({ ...base, qrOk: true, seatOk: null }).pass).toBe(true);
+  });
+
+  it("matches a tap only to an unknown person or the student themself", async () => {
+    const { seatMatches, seatDots } = await import("@/lib/verify/seat");
+    const people = [{ x: 0.5, y: 0.6 }, { x: 0.2, y: 0.7, student_id: "other" }, { x: 0.8, y: 0.7, student_id: "me" }];
+    expect(seatMatches(people, { x: 0.52, y: 0.62 }, "me")).toBe(true);
+    expect(seatMatches(people, { x: 0.2, y: 0.7 }, "me")).toBe(false); // that is someone else
+    expect(seatMatches(people, { x: 0.8, y: 0.7 }, "me")).toBe(true);
+    expect(seatMatches(people, { x: 0.05, y: 0.1 }, "me")).toBe(false); // nobody there
+    expect(seatDots(people, "me").map((d) => d.taken)).toEqual([false, true, false]);
+  });
+});

@@ -44,3 +44,6 @@ Progress:
 - step3-5 done: admin/professor/student dashboards + components/dash.tsx + lib/stats.ts (4 tests). NEXT: browser check prof + mobile, then full lint/unit/build/e2e, fix, commit
 - step6-7 done: logo gradient-id bug fixed; lint ✓ tsc ✓ unit 125 ✓ build ✓ e2e 11/11 ✓; phone layout checked (tabs, More sheet, no overflow). Committed and pushed (13f3a4d); Vercel prod READY at attendiq-rho.vercel.app.
 - LEFT: run edge live view (config liveview.enabled true) + test; push when user says.
+- 2026-11-23: cloud session's recorded-video demo (PR #1+#2, 13 commits) REVERTED here (user: build the demo here, live phones).
+  Tests back to edge 38 / web 125, tsc clean. Revert commit local, NOT pushed (user must say push).
+  NEXT: live 2-phone class here: phone 1 gate (outside), phone 2 inside (count + exit), liveview on, Mahi + Fahim.

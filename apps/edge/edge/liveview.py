@@ -63,10 +63,14 @@ def _caption(out: np.ndarray, text: str) -> None:
 
 
 def draw_faces(frame: np.ndarray, faces: Sequence[FaceDet], gallery: Gallery, memory: SessionMemory,
-               thr: Thresholds, title: str) -> np.ndarray:
+               thr: Thresholds, title: str, line: tuple[tuple[float, float], tuple[float, float]] | None = None) -> np.ndarray:
     import cv2
 
     out = frame.copy()
+    if line:  # the crossing line (normalised coords), so it can be checked against the doorway in the picture
+        h, w = out.shape[:2]
+        (ax, ay), (bx, by) = line
+        cv2.line(out, (int(ax * w), int(ay * h)), (int(bx * w), int(by * h)), AMBER, 3)
     for f in faces:
         text, colour = face_label(f, gallery, memory, thr)
         x1, y1, x2, y2 = (int(v) for v in f.box)

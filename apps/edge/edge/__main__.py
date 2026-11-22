@@ -305,7 +305,8 @@ def main(argv: list[str] | None = None) -> int:
             if liveview and liveview.due("exit"):
                 from edge.liveview import draw_faces
 
-                img = draw_faces(frame, faces, gallery, pipeline.memory, pipeline.cfg.thresholds, "way-out camera")
+                line = (pipeline.cfg.line_a, pipeline.cfg.line_b) if pipeline.cfg.entry_mode == "line" else None
+                img = draw_faces(frame, faces, gallery, pipeline.memory, pipeline.cfg.thresholds, "way-out camera", line)
                 liveview.update("exit", img)
 
     # ------------------------------------------------------------ heartbeat + session poll
@@ -432,7 +433,8 @@ def main(argv: list[str] | None = None) -> int:
             if liveview and liveview.due("gate"):
                 from edge.liveview import draw_faces
 
-                liveview.update("gate", draw_faces(frame, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera"))
+                line = (gate.cfg.line_a, gate.cfg.line_b) if gate.cfg.entry_mode == "line" else None
+                liveview.update("gate", draw_faces(frame, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera", line))
     except KeyboardInterrupt:
         pass
     finally:

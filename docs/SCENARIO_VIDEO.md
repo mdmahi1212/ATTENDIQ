@@ -4,10 +4,10 @@ Two phones record the scene at the same time, exactly where they stand in the li
 both recordings into a live session as if they were the cameras. The system makes every decision itself:
 present, unknown, left and came back, left and never came back (absent).
 
-| Phone | Live role | Stands | Sees |
+| Phone | Stands | Sees | Used for |
 |---|---|---|---|
-| Phone 1 | gate / way-in camera | inside the room, ~2–3 m from the door, head height, looking AT the door | faces of people walking IN |
-| Phone 2 | way-out camera (exit, `mode: presence`) | beside the door, looking INTO the room | faces of people walking OUT |
+| Phone 1 | **outside** the door, head height, facing the people coming to the door | faces of people walking IN | entry → present / late, re-entry |
+| Phone 2 | **inside** the room, near the door, looking into the room | the whole room + faces of people walking to the door | people count + exit (crossing the exit line toward the door) |
 
 ## Before filming
 
@@ -16,8 +16,9 @@ present, unknown, left and came back, left and never came back (absent).
    Keep one friend NOT enrolled as the stranger.
 2. Record in **landscape**, 30 fps, normal camera app. iPhone: Settings → Camera → Formats → **Most Compatible**
    (H.264; OpenCV may not read HEVC). Good light, faces visible, normal walking speed.
-3. Nobody who is already inside may look into phone 2 (in presence mode every recognised face it sees = OUT).
-   Seat the friends behind or beside phone 2.
+3. Phone 2 uses the **exit line**: a person only counts as leaving when their face crosses a line drawn just in
+   front of the door in phone 2's picture, moving toward the door. Students sitting in their seats never cross
+   it, so phone 2 can count the room at the same time.
 
 ## Script (start both phones recording, then clap once in view of BOTH phones)
 
@@ -44,13 +45,12 @@ Skip the earlier part of the one that started first, so both start at the clap:
 
 ## Full demo class (same as a real class, 10 minutes)
 
-Three recordings, every rule of a real class, compressed timing. Use this for the class presentation.
+Your two phones, every rule of a real class, compressed timing. Use this for the class presentation.
 
 | Phone | Films | Used for |
 |---|---|---|
-| Phone 1 | the door from inside (faces walking in) | entry recognition → present / late |
-| Phone 2 | beside the door, looking into the room (faces walking out) | exit recognition → left / came back |
-| Phone 3 | the seats, from the front or a corner, everyone in view | people count (YOLO11x) → count checks |
+| Phone 1 | outside the door: people coming in | entry recognition → present / late, re-entry |
+| Phone 2 | inside the room: the seats and the way to the door | people count (YOLO11x) → count checks, and exit (exit line) → left |
 
 **Demo timing** (only this class; real classes keep the normal policy): present until **2 min**, late until **5 min**,
 count check from **minute 2**, then every minute (push "verify now" to unmarked students, 3 min to answer),
@@ -58,9 +58,9 @@ professor's end-of-class count alert **2 min before the end**. The class ends **
 and is finalized by the server exactly like a timetable class. The rule engine runs once a minute, so things
 can show up to ~1 min after they happen in the video.
 
-### Script (record ~9 minutes; clap once at the start in view of all three phones)
+### Script (record ~9 minutes; clap once at the start in view of both phones)
 
-One friend plays the professor and sits in phone 3's view the whole time (`--staff 1`, the default).
+One friend plays the professor and sits in phone 2's view the whole time (`--staff 1`, the default).
 
 | Time | Who | Action | What the system does |
 |---|---|---|---|
@@ -69,7 +69,7 @@ One friend plays the professor and sits in phone 3's view the whole time (`--sta
 | 0:30 | C | walks in | **present** |
 | 0:40 | X | walks in looking down / hood up (face not seen) | nothing: X stays pending |
 | 0:50 | E (not enrolled) | walks in, looks around, leaves at 1:20 | red LED, unknown person |
-| 1:20 → | everyone | sit still in phone 3's view | room count becomes stable |
+| 1:20 → | everyone | sit still in phone 2's view | room count becomes stable |
 | ~2:00–3:00 | — | count 4 > 3 marked | **"Verify now" push** to the unmarked students |
 | live | X | during the presentation, verifies on their phone: face + blink/turn + scan the room QR on the professor's live page | X → **present** |
 | 3:00 | L | walks in | **late** (after 2 min) |
@@ -77,7 +77,7 @@ One friend plays the professor and sits in phone 3's view the whole time (`--sta
 | 4:45 | B | walks back in | re-entry, B stays present |
 | 6:00 | C | walks out and does not come back | amber LED |
 | ~8:00 | — | end-of-class check: 4 in the room, 5 marked present | **professor alert** "Count does not match" |
-| 9:00 | — | stop all three recordings | the class keeps running |
+| 9:00 | — | stop both recordings | the class keeps running |
 | 10:00 | — | class ends by itself | **final:** A, B, X present · L late · C absent (`left_no_return`) · D (never came) absent |
 
 Do NOT press Start recheck after the professor alert in this demo: A, B and L are on video, not in the room with
@@ -92,17 +92,38 @@ powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 -MqttPort 1
 cd apps\edge
 .\.venv\Scripts\python.exe -m edge --presence --start-session --full-class --section IOT401-01 `
   --video samples\door.mp4 --video-offset 3.4 `
-  --exit-video samples\way-out.mp4 --exit-offset 1.2 `
-  --room-video samples\room.mp4 --room-offset 2.0
+  --exit-video samples\room.mp4 --exit-offset 1.2
 ```
 
-On screen: http://127.0.0.1:8090 (three camera views + door LED) next to the professor's live page
+(`--room-video` exists for a third phone that only films the seats; you do not need it.)
+
+On screen: http://127.0.0.1:8090 (door camera, room camera with the people count, way-out view with the exit line, door LED) next to the professor's live page
 (statuses, room count, door timeline, room QR). X needs their own phone with the AttendIQ app and notifications on.
 The edge prints the final table when the server has ended the class.
 
-`config.yaml` for this run: `exit.enabled: true`, `exit.mode: presence`, `inside.enabled: true` (counting),
-`gate.rotate: 0`, `inside.rotate: 0`, `liveview.enabled: true`; set `inside.roi` to the seat area of phone 3
-(the default is the lower 70 % of the picture).
+`config.yaml` for this run:
+
+```yaml
+gate:
+  rotate: 0              # landscape recordings
+  entry_mode: presence   # phone 1 outside only sees people coming in (same as --presence)
+inside:
+  enabled: true          # phone 2 counts the room
+  rotate: 0
+  roi: [[0.0, 0.3], [1.0, 0.3], [1.0, 1.0], [0.0, 1.0]]   # seat area of phone 2's picture
+exit:
+  enabled: true
+  mode: line             # NOT presence: seated students face phone 2 and must not count as leaving
+  line_a: [0.25, 0.0]    # a line just in front of the door, top to bottom
+  line_b: [0.25, 1.0]
+  out_side: 1            # door on the LEFT of phone 2's picture; -1 if it is on the right
+liveview:
+  enabled: true
+```
+
+Set the line from your recording: open the live view, the exit line is drawn in amber on the way-out view.
+It must lie between the seats and the door, so everybody going out crosses it and nobody seated does.
+Test it once with yourself (walk out → amber LED, sit down → nothing) before filming the friends.
 
 ## Presentation mode: one command, the class starts and ends with the videos
 
@@ -136,7 +157,8 @@ One-time setup:
 - **Server switch** (off by default, because it lets the laptop's device key start and end real classes):
   `EDGE_REPLAY_SESSIONS=true` in `apps/web/.env.local`, then `node scripts/push-vercel-env.mjs` and redeploy
   (or set it in Vercel → Project → Settings → Environment Variables). Set it back to `false` after presenting.
-- `apps/edge/config.yaml`: `exit.enabled: true`, `exit.mode: presence`; `inside.enabled: false`;
+- `apps/edge/config.yaml`: as in "Full demo class" above (`exit.mode: line`); for a run without the room count
+  `inside.enabled: false`;
   `gate.rotate: 0` and `inside.rotate: 0` for landscape files (the live phone rotations do NOT apply to files).
   `liveview:` `enabled: true` to show the boxes, names and the **virtual door LED** at http://127.0.0.1:8090.
 - Copy the files to `apps/edge/samples/` (gitignored: faces).

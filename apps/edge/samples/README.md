@@ -10,5 +10,3 @@ Put `walk.mp4` here (gitignored). How to record it with phone #1:
 4. Replay it (a live session must exist in B204: Admin -> Sections -> "Start 30-min test session"):
    `cd apps/edge; .\.venv\Scripts\python.exe -m edge --video samples\walk.mp4 --direct --presence`
    (`--direct` posts to the web API without a broker; drop `--presence` once the entry line is set in config.yaml).
-
-For a full scenario (walk in, leave, come back, leave for good) with TWO recordings (way-in + way-out phone), see `docs/SCENARIO_VIDEO.md`.

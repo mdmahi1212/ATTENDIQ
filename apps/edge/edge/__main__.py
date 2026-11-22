@@ -1,16 +1,7 @@
-"""python -m edge [--video samples/walk.mp4 [--exit-video samples/exit.mp4]] [--direct] [--presence]
+"""python -m edge [--video samples/walk.mp4] [--direct] [--presence]
 
 Default: reads the gate camera from .env, publishes events over MQTT (SQLite outbox first).
---video FILE       play a recorded video instead of the live gate camera (real-time speed), exit at the end.
-                   Playback waits until a session is live in the room, so no frame is wasted.
---exit-video FILE  play a recording of the way-out (inside) camera at the same time (scenario replays).
---video-offset S / --exit-offset S  skip the first S seconds of a file, to line the two recordings up.
---room-video FILE  play a recording of the room (seats) for people counting at the same time.
---start-session    presentation: start a REAL class in the room when the videos start, end + finalize it when they
-                   finish, print the final statuses (server needs EDGE_REPLAY_SESSIONS=true). [--section IOT401-01]
---full-class       with --start-session: run it like a real class with demo timing (present 2 min, late 5 min,
-                   count checks from minute 2, professor alert 2 min before the end) and let the class end by
-                   itself at its scheduled end. [--class-minutes N] [--staff N]
+--video FILE  play a recorded video instead of the live camera (real-time speed), exit at the end.
 --direct      POST events straight to the web API instead of MQTT (no broker needed; still uses the outbox).
 """
 
@@ -44,32 +35,12 @@ log = logging.getLogger("edge")
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="edge")
     ap.add_argument("--video", help="video file instead of the live gate camera")
-    ap.add_argument("--exit-video", help="video file instead of the live inside / way-out camera (needs --video)")
-    ap.add_argument("--video-offset", type=float, default=0.0, help="skip the first S seconds of --video")
-    ap.add_argument("--exit-offset", type=float, default=0.0, help="skip the first S seconds of --exit-video")
-    ap.add_argument("--start-session", action="store_true",
-                    help="start a real class when the videos start and end it when they finish (needs --video)")
-    ap.add_argument("--room-video", help="video file of the room (seats) for people counting (needs --video)")
-    ap.add_argument("--room-offset", type=float, default=0.0, help="skip the first S seconds of --room-video")
-    ap.add_argument("--full-class", action="store_true",
-                    help="with --start-session: demo timing, class ends by itself at its scheduled end like a real one")
-    ap.add_argument("--class-minutes", type=int, help="class length for --full-class (default: the videos, at least 10)")
-    ap.add_argument("--staff", type=int, default=1, help="non-students the room camera counts (professor), default 1")
-    ap.add_argument("--section", help="section for --start-session, e.g. IOT401-01 (default: the room's main section)")
     ap.add_argument("--direct", action="store_true", help="POST events to the API instead of MQTT")
     ap.add_argument("--presence", action="store_true", help="entry_mode=presence (overrides config.yaml)")
     ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], help="rotate gate frames clockwise (overrides config.yaml)")
     ap.add_argument("--no-inside", action="store_true", help="do not run the inside (occupancy) camera")
     ap.add_argument("--debug", action="store_true", help="write the annotated inside frame to data/inside-debug.jpg")
     args = ap.parse_args(argv)
-    if args.exit_video and not args.video:
-        ap.error("--exit-video needs --video (both recordings are replayed together)")
-    if args.start_session and not args.video:
-        ap.error("--start-session needs --video")
-    if args.room_video and not args.video:
-        ap.error("--room-video needs --video (all recordings are replayed together)")
-    if (args.full_class or args.class_minutes) and not args.start_session:
-        ap.error("--full-class / --class-minutes need --start-session")
 
     env = Env()  # type: ignore[call-arg]
     cfg = load_yaml(env.edge_config_path)
@@ -116,18 +87,10 @@ def main(argv: list[str] | None = None) -> int:
             return info.mid if info.rc == 0 else None
 
     publisher = Publisher(outbox, send)
-    liveview: Any = None  # set below when the live view is enabled (emit lights its virtual door LED)
-    gallery = Gallery()
 
     def emit(env_: Envelope) -> None:
         publisher.publish(topics.for_event(room, env_.event_type), env_)
         log.info("event %s %s", env_.event_type, json.dumps(env_.payload))
-        if liveview:
-            from edge.liveview import led_for_event
-
-            lit = led_for_event(env_, gallery)
-            if lit:
-                liveview.led(*lit)
 
     def feedback(result: str) -> None:
         if client and connected.is_set():
@@ -137,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
         """Local clock corrected by the measured offset to the server (a wrong laptop clock must not change statuses)."""
         return datetime.now(UTC) + timedelta(seconds=api.clock_offset)
 
+    gallery = Gallery()
+    liveview = None
     if cfg.liveview.enabled:
         from edge.liveview import LiveView
 
@@ -223,10 +188,8 @@ def main(argv: list[str] | None = None) -> int:
                       payload={"camera": name, "failures": failures}))
 
     source = args.video or env.gate_camera_source
-    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera, skip_s=args.video_offset,
-                    report_end=not args.video)
-    if not args.video:
-        camera.start()  # recordings start in the main loop once a session is live
+    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera)
+    camera.start()
 
     from edge.detector import InsightFaceDetector
 
@@ -250,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         next_pub = next_count = 0.0
         sample = None
         period = min(cfg.inside.interval_s, liveview.period) if liveview else cfg.inside.interval_s
-        log.info("inside camera ready (%s), roi %s, %s on %s", cam.source, cfg.inside.roi,
+        log.info("inside camera ready (%s), roi %s, %s on %s", env.inside_camera_source, cfg.inside.roi,
                  Path(env.yolo_weights).name, "GPU" if yolo.device != "cpu" else "CPU")
         while not stop.is_set():
             t = time.monotonic()
@@ -258,9 +221,6 @@ def main(argv: list[str] | None = None) -> int:
                 session_seen = gate.session_id
                 counter.reset()
             _, frame, _ = cam.latest()
-            if cam.ended:  # a replayed room recording is over: stop counting its last frame
-                stop.wait(0.5)
-                continue
             if frame is not None and gate.session_id is not None:
                 frame = rotate_frame(frame, cfg.inside.rotate)
                 boxes = yolo(frame)
@@ -305,8 +265,7 @@ def main(argv: list[str] | None = None) -> int:
             if liveview and liveview.due("exit"):
                 from edge.liveview import draw_faces
 
-                line = (pipeline.cfg.line_a, pipeline.cfg.line_b) if pipeline.cfg.entry_mode == "line" else None
-                img = draw_faces(frame, faces, gallery, pipeline.memory, pipeline.cfg.thresholds, "way-out camera", line)
+                img = draw_faces(frame, faces, gallery, pipeline.memory, pipeline.cfg.thresholds, "way-out camera")
                 liveview.update("exit", img)
 
     # ------------------------------------------------------------ heartbeat + session poll
@@ -347,80 +306,22 @@ def main(argv: list[str] | None = None) -> int:
 
     # ------------------------------------------------------------ inside camera (occupancy)
     inside_cam: Camera | None = None
-    inside_source = str(resolve(args.exit_video)) if args.exit_video else env.inside_camera_source
-    use_inside = (args.exit_video or not args.video) and not args.no_inside
-    if args.exit_video and not (cfg.inside.enabled or exit_gate):
-        log.warning("--exit-video given but config.yaml has exit and inside disabled: the recording is ignored")
-    if (cfg.inside.enabled or exit_gate) and inside_source and use_inside:
-        inside_cam = Camera("inside", inside_source, on_camera, skip_s=args.exit_offset,
-                            report_end=not args.exit_video)
-        if not args.exit_video:
-            inside_cam.start()
-        if cfg.inside.enabled and not args.room_video:  # counting (off when this camera only watches the way out)
+    if (cfg.inside.enabled or exit_gate) and env.inside_camera_source and not args.no_inside and not args.video:
+        inside_cam = Camera("inside", env.inside_camera_source, on_camera)
+        inside_cam.start()
+        if cfg.inside.enabled:  # people counting (off when the inside camera only watches the way out)
             threading.Thread(target=occupancy_loop, args=(inside_cam,), daemon=True, name="occupancy").start()
         if exit_gate:
             threading.Thread(target=exit_loop, args=(inside_cam, exit_gate), daemon=True, name="exit").start()
 
-    # A separate recording of the seats for people counting (the way-out phone keeps watching the door).
-    room_cam: Camera | None = None
-    if args.room_video:
-        room_cam = Camera("inside", str(resolve(args.room_video)), on_camera, skip_s=args.room_offset, report_end=False)
-        threading.Thread(target=occupancy_loop, args=(room_cam,), daemon=True, name="occupancy").start()
-    recordings = [c for c in (camera, inside_cam if args.exit_video else None, room_cam) if c is not None]
-
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
-    replay_session: str | None = None
-    if args.start_session:
-        from edge.replay import DEMO_END_ALERT_MIN, class_minutes, full_class_minutes, video_seconds
-
-        length = max(video_seconds(c.source, c.skip_s) for c in recordings)
-        minutes = full_class_minutes(length, args.class_minutes) if args.full_class else class_minutes(length)
-        counting = room_cam is not None or (inside_cam is not None and cfg.inside.enabled)
-        if args.full_class and not counting:
-            log.warning("no room count (inside.enabled is off and no --room-video): the count checks and the "
-                        "professor alert cannot happen")
-        if args.full_class and length < (minutes - DEMO_END_ALERT_MIN) * 60:
-            log.warning("the videos end at %.1f min, before the end-of-class count check at minute %d: the professor "
-                        "alert needs a fresh room count then (record longer or pass a smaller --class-minutes)",
-                        length / 60, minutes - DEMO_END_ALERT_MIN)
-        try:
-            res = api.replay_session(minutes, args.section, demo_timing=args.full_class, staff_count=args.staff)
-        except EdgeApiError as e:
-            log.error("could not start the class: %s", e)
-            stop.set()
-            camera.stop()
-            return 2
-        replay_session = str(res["session_id"])
-        log.info("class started: %s, section %s, %d students with a face; videos %.0f s; class %d min%s",
-                 replay_session, res.get("section"), res.get("students_with_face", 0), length, minutes,
-                 " (demo timing, ends by itself)" if args.full_class else "")
-        set_session(replay_session, "replay")
-
     last_seq, n = -1, 0
-    videos_done = False
-    playing = not args.video
-    if args.video and gate.session_id is None:
-        log.info("waiting for a live session in %s before playing the recording(s)", room)
     try:
         while not stop.is_set():
-            if not playing and gate.session_id is not None:
-                playing = True  # start both recordings together so their timelines stay in step
-                for c in recordings:
-                    c.start()
-                log.info("playing %s", " + ".join(c.source for c in recordings))
-            if args.video and playing and all(c.ended for c in recordings):
-                if not args.full_class:
-                    time.sleep(2)  # let the last decisions publish
-                    break
-                if not videos_done:
-                    videos_done = True
-                    log.info("videos finished; the class keeps running until its scheduled end, like a real class")
-                if gate.session_id is None:  # the server ended + finalized it (seen by the session poll)
-                    log.info("the class has ended")
-                    break
-                time.sleep(0.5)
-                continue
+            if args.video and camera.ended:
+                time.sleep(2)  # let the last decisions publish
+                break
             seq, frame, _ = camera.latest()
             if frame is None or seq == last_seq or gate.session_id is None:
                 time.sleep(0.01)
@@ -435,8 +336,7 @@ def main(argv: list[str] | None = None) -> int:
             if liveview and liveview.due("gate"):
                 from edge.liveview import draw_faces
 
-                line = (gate.cfg.line_a, gate.cfg.line_b) if gate.cfg.entry_mode == "line" else None
-                liveview.update("gate", draw_faces(frame, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera", line))
+                liveview.update("gate", draw_faces(frame, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera"))
     except KeyboardInterrupt:
         pass
     finally:
@@ -444,38 +344,16 @@ def main(argv: list[str] | None = None) -> int:
         camera.stop()
         if inside_cam:
             inside_cam.stop()
-        if room_cam:
-            room_cam.stop()
         for tr in gate.tracker.clear():  # decide tracks still open at shutdown
             if tr.direction == "in" and not tr.decided:
                 gate._decide(tr)
         if args.direct:
             publisher.replay()
-        if replay_session:
-            finished = all(c.ended for c in recordings)
-            if finished:
-                from edge.replay import wait_until_sent
-
-                if not wait_until_sent(outbox.pending_count, publisher.replay if args.direct else None):
-                    log.warning("%d events still unsent; ending the class anyway", outbox.pending_count())
-                if not args.direct:
-                    time.sleep(5)  # MQTT -> ingest -> API batches
         if client:
             time.sleep(1)
             client.loop_stop()
             client.disconnect()
         log.info("stopped; stats %s; unsent %d", json.dumps(gate.stats), outbox.pending_count())
-        if replay_session:
-            if not all(c.ended for c in recordings):
-                log.warning("interrupted: class %s is still live; end it on the live page", replay_session)
-            else:
-                from edge.replay import print_results
-
-                try:
-                    print_results(api.end_replay_session(replay_session))
-                except EdgeApiError as e:
-                    log.error("could not end the class (end it on the live page): %s", e)
-                    return 1
     return 0
 
 

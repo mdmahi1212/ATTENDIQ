@@ -65,3 +65,8 @@ desktop.ini
 !.vscode/extensions.json
 *.db-shm
 *.db-wal
+
+# --- Demo recordings (faces; never commit) ---
+demo/videos/*
+!demo/videos/README.md
+demo/logs/

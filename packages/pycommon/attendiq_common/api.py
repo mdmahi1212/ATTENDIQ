@@ -74,6 +74,10 @@ class EdgeApi:
     def demo_session(self, started_minutes_ago: int, minutes: int) -> dict[str, Any]:
         return self._call("POST", "/sessions/demo", json={"started_minutes_ago": started_minutes_ago, "minutes": minutes}).json()
 
+    def demo_class(self, section: str, minutes: int) -> dict[str, Any]:
+        """Edge only: start a short real demo class (5 / 10 / 15 min) for a section in this device's room."""
+        return self._call("POST", "/sessions/demo-class", json={"section": section, "minutes": minutes}).json()
+
     def session_results(self, session_id: str) -> dict[str, Any]:
         return self._call("GET", f"/sessions/{session_id}/results").json()
 

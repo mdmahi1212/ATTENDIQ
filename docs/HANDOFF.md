@@ -60,3 +60,8 @@ Progress:
   Checks: web unit 131, tsc, lint, build; page checked desktop + 375 px. Start buttons NOT clicked (would start a real class).
 - 2026-11-23 INSTRUCTIONS.md has 5-person plans for a 10-min and a 5-min class. When making apps/edge/config.demo.yaml
   for the recordings, set inside.stable_count_seconds ~20 (config.yaml has 60; too slow for the 5-min class).
+- 2026-11-23 ONE-CLICK DEMO: demo\START-DEMO.bat -> python -m edge.demo: finds door*/room* pairs in demo\videos,
+  length from video (<=6 min -> 5, <=11 -> 10, else 15), starts face-api (port 8010) if down, POST
+  /api/edge/v1/sessions/demo-class (edge key; section in the device's room; 5/10/15 min; lib/demo-class.ts shared with
+  Admin -> Demo), opens live view + /sessions/<id>/dashboard, runs edge --direct --demo. NOT yet run end to end
+  (route needs a push; a run starts a real class).

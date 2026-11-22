@@ -65,27 +65,27 @@ Film this as a **second pair of videos** (e.g. `C:\videos\door5.mp4` and `room5.
 In the presentation press **5 min** instead of 10 min. Person 4 must finish "Verify now" before minute 3. Same final result as the 10-minute class.
 
 ### After filming
-1. Copy both videos to the laptop: `C:\videos\door.mp4` (phone 1) and `C:\videos\room.mp4` (phone 2).
+1. Copy both videos into the project's **`demo\videos`** folder and name them **`door.mp4`** (phone 1) and
+   **`room.mp4`** (phone 2). The 5-minute pair: **`door5.mp4`** + **`room5.mp4`**.
 2. Tell Claude "videos ready". Claude checks one frame of each and sets the rotation and the exit line
    (`apps\edge\config.demo.yaml`). Do not start the demo before this.
 
 ---
 
-## 2. Run the demo from the videos (the presentation)
+## 2. Run the demo from the videos (the presentation): ONE double-click
 
-1. Laptop: open PowerShell in `C:\dev\smart-attendence-system` and run
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts\run-video-demo.ps1 -Door C:\videos\door.mp4 -Room C:\videos\room.mp4
-   ```
-   It says "waiting for a live class". The live camera view opens at http://127.0.0.1:8090 (refresh it after ~10 s).
-2. Website (https://attendiq-rho.vercel.app) as admin: **Admin → Demo → IOT401-01 → 10 min** (or **5 min** for the short videos), confirm.
-   Both videos start within ~2 s.
-3. On the screen: the live camera view (boxes + names) and **Live dashboard** of the class (from Admin → Demo → Running now).
+1. Double-click **`demo\START-DEMO.bat`**. That is all. By itself it:
+   - finds the videos in `demo\videos` (if there are two pairs it asks "1 or 2": type the number, Enter),
+   - picks the class length from the video length (about 4¾ min → 5-minute class, about 9½ min → 10-minute class),
+   - starts the face API in its own window (needed for Person 4's "Verify now"),
+   - starts the class on the website, and opens the live camera view + the class's **Live dashboard** in the browser,
+   - plays both videos as the door and room cameras until the class ends.
+2. Sign in on the website as admin if the browser asks.
+3. On the screen: the live camera view (boxes + names) and the **Live dashboard** (both open by themselves).
 4. About 2–3 min in, **Person 4's phone gets "Verify now"**. Person 4 opens it, does the face check and scans the
-   room QR code (Admin → Demo → Running now → **Open class** shows it) → **present**. This part happens live, so the
-   face API must be running on the laptop (`scripts\start-face-api.ps1`). Others who get the same message ignore it.
+   room QR code (Admin → Demo → Running now → **Open class** shows it) → **present**. Others who get the same message ignore it.
 5. About 7 min in, the professor gets **"Count does not match"** (Person 3 left). Show it; do **not** press Start recheck.
-6. The class ends by itself after 10 min; the laptop window stops. Expected:
+6. The class ends by itself (5 or 10 min); the black window says "stopped". Expected:
 
 | Person | Final |
 |---|---|
@@ -95,7 +95,8 @@ In the presentation press **5 min** instead of 10 min. Person 4 must finish "Ver
 | 3 | absent (left and did not come back) |
 | everyone else enrolled | absent |
 
-If something goes wrong: take a photo of the PowerShell window and send it to Claude. Logs: `logs\video-demo-*.log`.
+If something goes wrong: take a photo of the black window and send it to Claude. Logs: `demo\logs\`.
+Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4> -Room <room.mp4>`, then Admin → Demo → 10 min.
 
 ---
 
@@ -145,3 +146,4 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 
 ## Done
 - 2026-11-23: Admin → Demo page (5 / 10 / 15 min / full class) and the video demo runner are live.
+- 2026-11-23: one-click demo: `demoSTART-DEMO.bat` + `demoideos` folder.

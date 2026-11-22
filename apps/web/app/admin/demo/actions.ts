@@ -2,8 +2,8 @@
 
 import { z } from "zod";
 import { check, formAction } from "@/lib/admin-action";
-import type { Json } from "@/lib/database.types";
-import { DEMO_LENGTHS, fullClassMinutes, withDemoPolicy } from "@/lib/demo";
+import { DEMO_LENGTHS } from "@/lib/demo";
+import { startDemoClass as start } from "@/lib/demo-class";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -19,32 +19,9 @@ export const startDemoClass = formAction({
   }),
   revalidate: ["/admin/demo", "/admin"],
   run: async ({ id, length }, { supabase }) => {
-    const { data: section } = check(
-      await supabase.from("sections").select("room_id, timetable_slots(start_time, end_time)").eq("id", id).single(),
-    );
+    const { data: section } = check(await supabase.from("sections").select("room_id").eq("id", id).single());
     if (!section?.room_id) return { ok: false, message: "Give the section a room first." };
-    const full = length === "full";
-    const minutes = full ? fullClassMinutes(section.timetable_slots) : Number(length);
-    const admin = createAdminClient();
-    const { data: sessionId } = check(
-      await admin.rpc("create_adhoc_session", {
-        p_room: section.room_id,
-        p_section: id,
-        p_starts_at: new Date().toISOString(),
-        p_minutes: minutes,
-        p_simulation: false,
-      }),
-    );
-    if (!full) {
-      const { data: s } = check(await admin.from("class_sessions").select("policy").eq("id", String(sessionId)).single());
-      check(
-        // staff_count 0: no professor walks through a short demo, so every person the room camera counts is a student.
-        await admin
-          .from("class_sessions")
-          .update({ policy: withDemoPolicy(s?.policy, minutes) as Json, staff_count: 0 })
-          .eq("id", String(sessionId)),
-      );
-    }
-    return `${full ? "Full" : `${minutes}-minute demo`} class started (${minutes} min). Cameras and the laptop pick it up within seconds.`;
+    const { minutes } = await start(createAdminClient(), { sectionId: id, roomId: section.room_id, length });
+    return `${length === "full" ? "Full" : `${minutes}-minute demo`} class started (${minutes} min). Cameras and the laptop pick it up within seconds.`;
   },
 });

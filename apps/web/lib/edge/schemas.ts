@@ -38,4 +38,10 @@ export const demoSessionSchema = z.object({
   minutes: z.number().int().min(10).max(240).default(75),
 });
 
+/** One-click recorded demo: a short demo class for a section in the device's room. */
+export const demoClassSchema = z.object({
+  section: z.string().regex(/^[A-Z0-9-]{2,12}-[0-9A-Z]{1,4}$/, "section like IOT401-01"),
+  minutes: z.union([z.literal(5), z.literal(10), z.literal(15)]),
+});
+
 export type RpcBatchResult = { accepted: number; duplicates: number; rejected: { event_id: string | null; reason: string }[] };

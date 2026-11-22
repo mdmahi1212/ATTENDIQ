@@ -453,3 +453,59 @@ def test_virtual_led_follows_door_events() -> None:
         lv.led("green", f"s{i}")
     events = lv.led_state()["events"]
     assert len(events) == 10 and events[-1]["text"] == "s11" and events[-1]["seq"] == 12  # type: ignore[index]
+
+
+# ---------------------------------------------------------------- one-click demo (edge.demo)
+def test_demo_finds_videos_case_insensitive(tmp_path) -> None:  # noqa: ANN001
+    from edge.demo import find_video
+
+    (tmp_path / "Door.MOV").write_bytes(b"")
+    (tmp_path / "room.mp4").write_bytes(b"")
+    (tmp_path / "notes.txt").write_text("x")
+    assert find_video(tmp_path, "door").name == "Door.MOV"  # type: ignore[union-attr]
+    assert find_video(tmp_path, "room").name == "room.mp4"  # type: ignore[union-attr]
+    assert find_video(tmp_path / "missing", "door") is None
+
+
+def test_demo_config_overrides_only_the_camera_roles() -> None:
+    from edge.demo import DEFAULT_SETTINGS, demo_config
+
+    base = {"room_code": "B204", "gate": {"accept": 0.5, "rotate": 270, "entry_mode": "line"}, "exit": {"mode": "presence"}}
+    cfg = demo_config(base, {**DEFAULT_SETTINGS, "door_side": "right", "exit_line": [[0.7, 0], [0.7, 1]]})
+    assert cfg["room_code"] == "B204" and cfg["gate"]["accept"] == 0.5  # the user's tuning is kept
+    assert cfg["gate"]["rotate"] == 0 and cfg["gate"]["entry_mode"] == "presence"
+    assert cfg["exit"] == {"mode": "line", "enabled": True, "line_a": [0.7, 0], "line_b": [0.7, 1], "out_side": -1}
+    assert cfg["inside"]["enabled"] and cfg["liveview"]["enabled"]
+
+
+def test_demo_edge_args_quick_and_full(tmp_path) -> None:  # noqa: ANN001
+    from edge.demo import DEFAULT_SETTINGS, edge_args
+
+    door, room = tmp_path / "door.mp4", tmp_path / "room.mp4"
+    quick = edge_args(door, room, DEFAULT_SETTINGS, full=False)
+    assert "--full-class" not in quick and "--video-offset" not in quick
+    assert quick[quick.index("--video") + 1] == str(door) and quick[quick.index("--exit-video") + 1] == str(room)
+    full = edge_args(door, room, {**DEFAULT_SETTINGS, "door_offset": 4.5, "staff": 0}, full=True)
+    assert "--full-class" in full and full[full.index("--video-offset") + 1] == "4.5"
+    assert full[full.index("--staff") + 1] == "0"
+
+
+def test_demo_door_side_words() -> None:
+    import pytest
+
+    from edge.demo import out_side
+
+    assert out_side("left") == 1 and out_side("Right") == -1 and out_side("bottom") == 1 and out_side("top") == -1
+    with pytest.raises(ValueError):
+        out_side("north")
+
+
+def test_demo_settings_file_is_created_from_the_example(tmp_path) -> None:  # noqa: ANN001
+    from pathlib import Path
+
+    from edge.demo import load_settings
+
+    example = Path(__file__).resolve().parents[3] / "demo" / "settings.example.yaml"
+    (tmp_path / "settings.example.yaml").write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+    s = load_settings(tmp_path)
+    assert (tmp_path / "settings.yaml").exists() and s["section"] == "IOT401-01" and s["door_side"] == "left"

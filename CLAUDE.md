@@ -52,6 +52,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 8. Keep files small and typed. No `any` in TypeScript unless commented why. Python uses type hints and `ruff`.
 9. Ask the user before: adding a new paid service, changing a locked decision, deleting data, or anything that needs their accounts/keys.
 10. The dev machine is Windows. Write PowerShell-compatible scripts (`scripts/*.ps1`) and use `pathlib` in Python. Avoid paths with spaces for the repo (recommend `C:\dev\smart-attendance`).
+11. `INSTRUCTIONS.md` is the user's short to-do list (Now / Later / Done). Keep it SHORT and simple: one line per step. Add new steps the user must do, move finished ones to Done with the date.
 
 ## Commands (fill in as they are created)
 - Web: `cd apps/web; npm run dev | npm run lint | npm run typecheck | npm test | npm run build | npm run e2e` (use `npm.cmd` / `npx.cmd` in PowerShell)
@@ -63,6 +64,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 - Start everything on the laptop: `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 [-MqttPort 1884] [-FaceApiPort 8010]` (use -FaceApiPort when another program holds 8000)
 - Face API + tunnel only: `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1`
 - Scenario video replay (2 recordings, see docs/SCENARIO_VIDEO.md): `cd apps/edge; .\.venv\Scripts\python.exe -m edge --direct --presence --video samples\scene-in.mp4 --exit-video samples\scene-out.mp4 [--video-offset S --exit-offset S] [--room-video samples\room.mp4] [--start-session [--full-class] --section IOT401-01]` (`--start-session` needs `EDGE_REPLAY_SESSIONS=true` on the server)
+- One-click demo: put `door.mp4` + `room.mp4` in `demo\`, double-click `demo\START-DEMO.bat` (= `cd apps/edge; .\.venv\Scripts\python.exe -m edge.demo --full`)
 - Simulator: `cd apps/simulator; .\.venv\Scripts\python.exe -m simulator run [--direct] [--finalize] [--script scripts/mismatch.yaml --hold-minutes 3]`
 - Device key (+ MQTT user): `powershell -ExecutionPolicy Bypass -File scripts\new-device-key.ps1 -DeviceId <uuid> [-Apply] [-MqttUser <name>]`
 - Reset demo data: `powershell -ExecutionPolicy Bypass -File scripts\reset-demo.ps1`

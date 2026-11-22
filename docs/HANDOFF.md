@@ -101,3 +101,6 @@ Progress:
 - 2026-11-23 rule F DONE: table student_devices (migration 20261122194154, applied; RLS own/admin read, admin delete;
   audited). verify route needs meta.device_id (localStorage id; SHA-256 stored); first verify registers, other phone
   -> 403 wrong_device; Admin -> People -> Reset phone. Web unit 136.
+- 2026-11-23 #4 DONE: OCCUPANCY_UPDATED payload.people [{x,y feet 0..1, student_id?}] (edge/roommap.py, name from body
+  tracker identity); live dashboard 'Room map' card (latest occupancy edge_event via admin client after requireRole).
+  Body-based time-in-class NOT built (door-event time stays). Edge 66, web 138.

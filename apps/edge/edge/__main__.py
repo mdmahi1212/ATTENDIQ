@@ -296,6 +296,8 @@ def main(argv: list[str] | None = None) -> int:
 
         door_bodies = DoorBodyWatcher(gate.report_unknown_entry, cfg.gate.body_min_s)
 
+    from edge.roommap import room_people
+
     def occupancy_loop(cam: Camera) -> None:
         from edge.occupancy import OccupancyCounter, annotate, in_roi
 
@@ -324,8 +326,10 @@ def main(argv: list[str] | None = None) -> int:
                     # all bodies, not only seated ones: people walking to the door leave the seat area
                     body_exit.update(boxes, frame.shape[1], frame.shape[0], time.monotonic(), ids)
                 else:
-                    boxes = yolo(frame)
+                    boxes, ids = yolo(frame), None
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
+                people = room_people(boxes, ids, frame.shape[1], frame.shape[0],
+                                     body_exit.identity if body_exit else None)
                 if t >= next_count or sample is None:
                     next_count = t + cfg.inside.interval_s
                     sample = counter.add(len(kept), t)
@@ -343,7 +347,8 @@ def main(argv: list[str] | None = None) -> int:
                     next_pub = t + cfg.inside.publish_s
                     emit(Envelope(event_type=EventType.OCCUPANCY_UPDATED, source_device_id=device_id, session_id=gate.session_id,
                                   observed_at=server_now(), model_version=Path(env.yolo_weights).stem,
-                                  payload={"raw": sample.raw, "smoothed": sample.smoothed, "stable": sample.stable}))
+                                  payload={"raw": sample.raw, "smoothed": sample.smoothed, "stable": sample.stable,
+                                           "people": people}))
             stop.wait(max(0.05, period - (time.monotonic() - t)))
 
     inside_stats: dict[str, Any] = {}

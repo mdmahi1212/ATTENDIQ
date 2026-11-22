@@ -10,7 +10,9 @@ import { deviceHealth } from "@/lib/status";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ageSeconds, fmtSeoul } from "@/lib/time";
+import { parsePeople } from "@/lib/room-map";
 import { LiveRefresh } from "../live-refresh";
+import { RoomMap } from "./room-map";
 
 const W = 640;
 const H = 170;
@@ -37,7 +39,7 @@ export default async function SessionDashboardPage({ params }: PageProps<"/sessi
     .gte("created_at", minutesAgoIso(5))
     .order("created_at", { ascending: false })
     .limit(1);
-  const [{ data: roster }, { data: gate }, { data: occ }, { data: devices }] = await Promise.all([
+  const [{ data: roster }, { data: gate }, { data: occ }, { data: devices }, { data: lastCount }] = await Promise.all([
     supabase
       .from("attendance")
       .select("student_id, status, method, first_seen_at, profiles!attendance_student_id_fkey(full_name, is_simulated)")
@@ -47,6 +49,15 @@ export default async function SessionDashboardPage({ params }: PageProps<"/sessi
     session.room_id
       ? createAdminClient().from("edge_devices").select("name, kind, last_seen").eq("room_id", session.room_id).eq("is_active", true)
       : Promise.resolve({ data: [] as { name: string; kind: string; last_seen: string | null }[] }),
+    // Latest room-camera count with positions (room map). Staff only: this page is behind requireRole.
+    createAdminClient()
+      .from("edge_events")
+      .select("payload, observed_at")
+      .eq("session_id", id)
+      .eq("event_type", "OCCUPANCY_UPDATED")
+      .order("observed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const live = session.state === "live" || session.state === "recheck";
@@ -130,6 +141,16 @@ export default async function SessionDashboardPage({ params }: PageProps<"/sessi
           </Card>
         ))}
       </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-sm">Room map (room camera)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RoomMap people={parsePeople(lastCount?.payload)} names={names}
+            at={lastCount ? fmtSeoul(lastCount.observed_at, "HH:mm:ss") : null} />
+        </CardContent>
+      </Card>
 
       <div className="mb-4 grid gap-3 lg:grid-cols-[3fr_2fr]">
         <Card>

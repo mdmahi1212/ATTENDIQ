@@ -52,6 +52,9 @@ class GateYaml(BaseModel):
     # unknown entry (LED red). Uses the inside camera's YOLO weights.
     body_tracking: bool = True
     body_min_s: float = 1.0
+    # Photo / screen attack check at the door (InsightFace liveness addon). Tune with the live_score in the logs.
+    liveness: bool = True
+    live_threshold: float = 0.3
     accept: float = 0.45
     margin: float = 0.08
     min_votes: int = 2
@@ -61,6 +64,7 @@ class GateYaml(BaseModel):
                           presence_min_s=self.presence_min_s, min_travel_px=self.min_travel_px, min_face_px=self.min_face_px,
                           min_det_score=self.min_det_score,
                           thresholds=Thresholds(accept=self.accept, margin=self.margin, min_votes=self.min_votes),
+                          live_threshold=self.live_threshold if self.liveness else None,
                           model_version=f"buffalo_l / thr-{self.accept}")
 
 

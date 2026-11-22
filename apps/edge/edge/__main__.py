@@ -238,7 +238,12 @@ def main(argv: list[str] | None = None) -> int:
 
     from edge.detector import InsightFaceDetector
 
-    detector = InsightFaceDetector(resolve(env.insightface_home), cfg.gate.det_size, device=cfg.gate.device)
+    liveness_model = resolve(env.insightface_home) / "addons" / "liveness.onnx"
+    use_liveness = cfg.gate.liveness and liveness_model.exists()
+    if cfg.gate.liveness and not use_liveness:
+        log.warning("door photo-attack check off: %s not found (start the face API once to download it)", liveness_model)
+    detector = InsightFaceDetector(resolve(env.insightface_home), cfg.gate.det_size, device=cfg.gate.device,
+                                   liveness=use_liveness)
     detector_lock = threading.Lock()  # the gate loop and the exit loop share one InsightFace model
 
     def detect(frame: Any) -> list[Any]:

@@ -26,6 +26,7 @@ class FaceDet:
     box: Box
     det_score: float
     embedding: np.ndarray | None  # unit vector, None when the crop failed the quality gates
+    live_score: float | None = None  # passive anti-spoofing (InsightFace liveness addon); None = not measured
 
 
 class Detector(Protocol):
@@ -50,6 +51,9 @@ class GateConfig:
     min_face_px: int = 60
     min_det_score: float = 0.6
     thresholds: Thresholds = Thresholds()
+    # Door photo-attack check: a walk-in whose median live score is below this is refused as a spoof
+    # (LED red, unknown entry). None = off. Lower than the phone's 0.8: door faces are farther and softer.
+    live_threshold: float | None = None
     model_version: str = "buffalo_l / thr-0.45"
 
 
@@ -69,6 +73,7 @@ class GatePipeline:
         self.stats = {"frames": 0, "faces": 0, "in": 0, "out": 0, "recognised": 0, "unknown": 0}
         self._last_out_at = -1e9  # monotonic time of the last reported OUT (dedupe face + body trackers)
         self._t: float | None = None  # time of the frame being processed
+        self._live: dict[int, list[float]] = {}  # live scores per face track (door photo-attack check)
 
     # ------------------------------------------------------------ session control
     def start(self, session_id: uuid.UUID, gallery_data: dict[str, Any]) -> None:
@@ -101,6 +106,11 @@ class GatePipeline:
             dets.append((f.box, f.det_score, f.embedding if ok else None))
         self.stats["faces"] += len(faces)
         touched, ended = self.tracker.update(dets, t)
+        if self.cfg.live_threshold is not None:
+            by_box = {f.box: f.live_score for f in faces if f.live_score is not None}
+            for tr in touched:
+                if tr.box in by_box:
+                    self._live.setdefault(tr.track_id, []).append(by_box[tr.box])
         a = (self.cfg.line_a[0] * frame_w, self.cfg.line_a[1] * frame_h)
         b = (self.cfg.line_b[0] * frame_w, self.cfg.line_b[1] * frame_h)
         for tr in touched:
@@ -161,7 +171,19 @@ class GatePipeline:
     def _decide(self, tr: Track) -> Decision:
         tr.decided = True
         d = decide([e for _, e in tr.embeddings], self.gallery, self.cfg.thresholds)
-        payload = {"track_id": tr.track_id, "score": d.score, "margin": d.margin, "votes": d.votes, "crops": d.crops}
+        payload: dict[str, Any] = {"track_id": tr.track_id, "score": d.score, "margin": d.margin, "votes": d.votes,
+                                   "crops": d.crops}
+        lives = self._live.pop(tr.track_id, [])
+        if lives:
+            live = float(np.median(lives))
+            payload["live_score"] = round(live, 3)
+            if self.cfg.live_threshold is not None and len(lives) >= 2 and live < self.cfg.live_threshold:
+                # A photo / screen held up to the door camera: refused even if the face matches a student.
+                self.stats["spoof"] = self.stats.get("spoof", 0) + 1
+                self._event(EventType.GATE_ENTRY_UNKNOWN, {**payload, "spoof": True, "matched": d.student_id})
+                if self._feedback:
+                    self._feedback("unknown")
+                return Decision(None, d.score, d.margin, d.votes, d.crops)
         if d.recognised and d.student_id:
             tr.student_id = d.student_id
             if self.memory.should_report_entry(d.student_id):

@@ -377,3 +377,35 @@ def test_exit_lights_the_led_amber_and_the_live_view_shows_it() -> None:
         assert view.led_state()["color"] == color
     view._led = ("ok", view._led[1] - 2.0)  # 2 s later: the firmware turns the LED off after 1.5 s
     assert view.led_state() == {"color": "off", "last": "ok", "seconds_ago": 2.0}
+
+
+# ---------------------------------------------------------------- door photo-attack check
+def _door_pipe() -> tuple[GatePipeline, list[Envelope], list[str]]:
+    events: list[Envelope] = []
+    fb: list[str] = []
+    cfg = GateConfig(entry_mode="presence", live_threshold=0.3)
+    pipe = GatePipeline(cfg, Gallery(), DEV, events.append, fb.append, clock=lambda: datetime(2026, 11, 23, 1, tzinfo=UTC))
+    pipe.start(uuid.uuid4(), GALLERY)
+    return pipe, events, fb
+
+
+def _stand(pipe: GatePipeline, live: float) -> None:
+    for i in range(12):  # a known student's face in view for 1.2 s, then gone
+        pipe.process([FaceDet((280, 180, 400, 300), 0.9, near(A, 0.8, 40 + i), live)], 640, 480, i * 0.1)
+    for k in range(12):
+        pipe.process([], 640, 480, 1.2 + k * 0.1)
+
+
+def test_a_photo_of_a_student_at_the_door_is_refused() -> None:
+    pipe, events, fb = _door_pipe()
+    _stand(pipe, live=0.05)
+    assert types(events) == ["GATE_PERSON_IN", "GATE_ENTRY_UNKNOWN"]  # someone came in; refused as a spoof
+    assert events[1].payload["spoof"] is True and events[1].payload["matched"] == "stu-a"
+    assert fb == ["unknown"] and "stu-a" not in pipe.memory.inside
+
+
+def test_a_real_face_passes_and_its_live_score_is_logged() -> None:
+    pipe, events, fb = _door_pipe()
+    _stand(pipe, live=0.95)
+    rec = [e for e in events if e.event_type.value == "GATE_ENTRY_RECOGNISED"]
+    assert len(rec) == 1 and rec[0].payload["live_score"] == 0.95 and fb[-1] == "ok"

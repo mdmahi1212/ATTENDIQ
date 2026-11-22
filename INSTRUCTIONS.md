@@ -116,7 +116,7 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
    - **Both cameras follow faces and bodies** (blue boxes = bodies):
      | Camera | Face seen | Face never seen |
      |---|---|---|
-     | Door (phone 1) | recognised → present / late (LED green); unknown face → LED red | "someone entered without a face" logged, LED red; the room count catches them |
+     | Door (phone 1) | recognised → present / late (LED green); unknown face, or a **photo / phone screen of a face** (anti-spoof check) → LED red, not marked | "someone entered without a face" logged, LED red; the room count catches them |
      | Room (phone 2), someone walks out | that student is OUT → absent at the end if they never come back | if their face was seen earlier in class: still that student (absent if not back); never seen: "someone left", professor gets the count alert near the end |
    Double-clicking it again is safe: parts that already run are reused.
 3. Real classes start by themselves from the timetable. For a live demo: **Admin → Demo → IOT401-01 →**

@@ -36,12 +36,16 @@ def face_providers(device: str = "auto") -> list[str]:
 
 
 class InsightFaceDetector:
-    def __init__(self, root: Path, det_size: int = 640, model: str = "buffalo_l", device: str = "auto") -> None:
+    def __init__(self, root: Path, det_size: int = 640, model: str = "buffalo_l", device: str = "auto",
+                 liveness: bool = False) -> None:
         from insightface.app import FaceAnalysis
 
         providers = face_providers(device)
+        # liveness: InsightFace's passive anti-spoofing addon (the face API's liveness.onnx under the same root);
+        # "observe" = every face keeps its embedding and gets a live_score, the gate decides what a spoof means.
+        extra = {"addons": ["liveness"], "liveness_mode": "observe"} if liveness else {}
         self._app = FaceAnalysis(name=model, root=str(root), allowed_modules=["detection", "recognition"],
-                                 providers=providers)
+                                 providers=providers, **extra)
         self._app.prepare(ctx_id=0 if providers is GPU else -1, det_size=(det_size, det_size))
         # What the sessions actually run on (a provider can be listed but fail to load).
         used = {p for m in self._app.models.values() for p in m.session.get_providers()}
@@ -52,5 +56,8 @@ class InsightFaceDetector:
         for f in self._app.get(frame):
             emb = getattr(f, "normed_embedding", None)
             x1, y1, x2, y2 = (float(v) for v in f.bbox)
-            out.append(FaceDet((x1, y1, x2, y2), float(f.det_score), None if emb is None else np.asarray(emb, dtype=np.float32)))
+            lv = getattr(f, "liveness", None)
+            live = lv.get("live_score") if isinstance(lv, dict) else None
+            out.append(FaceDet((x1, y1, x2, y2), float(f.det_score), None if emb is None else np.asarray(emb, dtype=np.float32),
+                               None if live is None else float(live)))
         return out

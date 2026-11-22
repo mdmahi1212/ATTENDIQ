@@ -89,3 +89,6 @@ Progress:
   one YOLO per camera (ids live in the model); IdTracker feeds BodyExitTracker / DoorBodyWatcher; falls back to IoU if
   tracking fails. Real check: 6 people in the InsightFace sample kept ids 1-6 over 4 frames on GPU. lap==0.5.14 pinned
   (Ultralytics auto-installed it). Edge 58 tests.
+- 2026-11-23 #3 DONE (local commit): door anti-spoof = InsightFace liveness addon (face-api/models/addons/liveness.onnx)
+  in the edge detector (observe mode, GPU); gate.live_threshold 0.3 (median over >=2 crops) -> GATE_ENTRY_UNKNOWN
+  {spoof, matched} + LED red; every decision logs live_score (tune after real tests). Real picture scores 0.91-0.99.

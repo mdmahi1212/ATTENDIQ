@@ -5,7 +5,7 @@ import { SimBadge } from "@/components/badges";
 import { StateBadge } from "@/components/state-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireRole } from "@/lib/auth";
-import { insideAt, timeInClass, windowEnd, type DoorEvent } from "@/lib/dashboard";
+import { insideAt, minutesAgoIso, timeInClass, windowEnd, type DoorEvent } from "@/lib/dashboard";
 import { deviceHealth } from "@/lib/status";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +28,15 @@ export default async function SessionDashboardPage({ params }: PageProps<"/sessi
     .maybeSingle();
   if (!session) notFound(); // RLS: staff of the section or admin
 
+  // Rule C: the professor's own "unknown person in the room" alerts for this class in the last 5 minutes.
+  const { data: unknownAlerts } = await supabase
+    .from("notifications")
+    .select("created_at")
+    .eq("type", "unknown_in_room")
+    .eq("data->>session_id", id)
+    .gte("created_at", minutesAgoIso(5))
+    .order("created_at", { ascending: false })
+    .limit(1);
   const [{ data: roster }, { data: gate }, { data: occ }, { data: devices }] = await Promise.all([
     supabase
       .from("attendance")
@@ -97,6 +106,12 @@ export default async function SessionDashboardPage({ params }: PageProps<"/sessi
           </span>
         }
       />
+      {live && (unknownAlerts ?? []).length > 0 && (
+        <p className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 p-3 text-sm font-medium text-rose-900" data-testid="unknown-in-room">
+          Unknown person in the room (seen {fmtSeoul(unknownAlerts![0].created_at, "HH:mm")}): a face that is not enrolled in this class.
+          Check the live camera view on the classroom laptop. No picture is stored.
+        </p>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[

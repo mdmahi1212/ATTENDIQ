@@ -32,9 +32,9 @@ export const endSession = formAction({
   revalidate: "/sessions",
   run: async ({ session_id }, { supabase }) => {
     const { data } = check(await supabase.rpc("finalize_session", { p_session: session_id }));
-    const r = data as { finalized?: boolean; absent?: number; needs_review?: number; reason?: string } | null;
+    const r = data as { finalized?: boolean; absent?: number; needs_review?: number; unconfirmed?: number; reason?: string } | null;
     if (!r?.finalized) return { ok: false, message: `Not finalized (${r?.reason ?? "unknown"}).` };
-    return `Session ended: ${r.absent ?? 0} absent, ${r.needs_review ?? 0} need review.`;
+    return `Session ended: ${r.absent ?? 0} absent, ${r.needs_review ?? 0} need review, ${r.unconfirmed ?? 0} not seen in the room.`;
   },
 });
 

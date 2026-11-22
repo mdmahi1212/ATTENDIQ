@@ -10,6 +10,8 @@ export const EDGE_EVENT_TYPES = [
   "CAMERA_OFFLINE",
   "CAMERA_ONLINE",
   "EDGE_HEARTBEAT",
+  "ROOM_SEEN",
+  "ROOM_UNKNOWN_FACE",
 ] as const;
 
 export const MAX_BATCH = 500;

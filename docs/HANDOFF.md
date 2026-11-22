@@ -92,3 +92,9 @@ Progress:
 - 2026-11-23 #3 DONE (local commit): door anti-spoof = InsightFace liveness addon (face-api/models/addons/liveness.onnx)
   in the edge detector (observe mode, GPU); gate.live_threshold 0.3 (median over >=2 crops) -> GATE_ENTRY_UNKNOWN
   {spoof, matched} + LED red; every decision logs live_score (tune after real tests). Real picture scores 0.91-0.99.
+- 2026-11-23 rules E+B+C DONE (local commit): migration 20261122193723 (applied): event types ROOM_SEEN /
+  ROOM_UNKNOWN_FACE; apply_edge_events alerts staff 'unknown_in_room' (max 1 per 5 min, not for simulations);
+  finalize flags 'unconfirmed' (gate: no ROOM_SEEN after first_seen_at; self_verify: none within -2..+10 min) only
+  if the class had any ROOM_SEEN; staff notified. Edge roomwatch.py (ROOM_SEEN 1/min/student; unknown after 5 frames
+  in 10 s with best < 0.30, 1 per 2 min). Web: pills 'not seen in room', 'left, not back'; dashboard banner.
+  Rolled-back SQL test: 2 events accepted, 1 alert, fahim unconfirmed, mahi clean. Edge 64, web 133.

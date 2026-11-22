@@ -15,7 +15,7 @@ const CELL: Record<DayStatus, string> = {
   pending: "bg-gray-400",
 };
 const METHOD: Record<string, string> = { gate: "door camera", self_verify: "self-verify", recheck: "recheck", manual: "set by professor", appeal: "appeal" };
-const FLAG: Record<string, string> = { gate_out: "went out", reentry: "came back", very_late: "very late", needs_review: "under review", manual_check: "manual check asked", recheck_failed: "missed the recheck" };
+const FLAG: Record<string, string> = { gate_out: "went out", reentry: "came back", very_late: "very late", needs_review: "under review", manual_check: "manual check asked", recheck_failed: "missed the recheck", unconfirmed: "not seen in the room (professor review)", left_no_return: "left and did not come back" };
 
 export default async function MyAttendance() {
   const user = await requireRole("student");

@@ -23,6 +23,8 @@ class EventType(StrEnum):
     CAMERA_OFFLINE = "CAMERA_OFFLINE"
     CAMERA_ONLINE = "CAMERA_ONLINE"
     EDGE_HEARTBEAT = "EDGE_HEARTBEAT"
+    ROOM_SEEN = "ROOM_SEEN"  # the room camera recognised an enrolled student (rules E + B: room confirmation)
+    ROOM_UNKNOWN_FACE = "ROOM_UNKNOWN_FACE"  # a clear face in the room matches nobody in the class (rule C)
 
 
 SESSIONLESS = {EventType.CAMERA_OFFLINE, EventType.CAMERA_ONLINE, EventType.EDGE_HEARTBEAT}

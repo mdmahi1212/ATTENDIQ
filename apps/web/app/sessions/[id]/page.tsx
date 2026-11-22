@@ -71,7 +71,7 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
   const banner = mismatchText(c.mismatch);
   const live = session.state === "live" || session.state === "recheck";
   const openReq = (requests ?? []).filter((r) => r.status === "open");
-  const reviewRows = rows.filter((r) => r.flags.includes("manual_check") || r.flags.includes("needs_review"));
+  const reviewRows = rows.filter((r) => r.flags.includes("manual_check") || r.flags.includes("needs_review") || r.flags.includes("unconfirmed"));
   const title = `${session.sections?.courses?.code ?? "?"}-${session.sections?.section_no ?? ""} · room ${session.rooms?.code ?? "—"}`;
 
   return (
@@ -201,6 +201,8 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
                     {r.flags.includes("manual_check") && <Pill tone="amber">asks manual check</Pill>}
                     {r.flags.includes("needs_review") && <Pill tone="amber">needs review</Pill>}
                     {r.flags.includes("recheck_failed") && <Pill tone="red">recheck failed</Pill>}
+                    {r.flags.includes("unconfirmed") && <Pill tone="amber">not seen in room</Pill>}
+                    {r.flags.includes("left_no_return") && <Pill tone="red">left, not back</Pill>}
                   </span>
                   {r.note && <span className="block text-muted-foreground">{r.note}</span>}
                 </td>

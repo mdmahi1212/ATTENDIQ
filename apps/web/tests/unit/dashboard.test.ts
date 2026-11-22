@@ -44,3 +44,10 @@ describe("timeInClass (door events only)", () => {
     expect(insideAt(t, T0 + 30 * M)).toBe(1);
   });
 });
+
+describe("minutesAgoIso", () => {
+  it("goes back the given minutes", async () => {
+    const { minutesAgoIso } = await import("@/lib/dashboard");
+    expect(minutesAgoIso(5, new Date("2026-11-23T10:00:00Z"))).toBe("2026-11-23T09:55:00.000Z");
+  });
+});

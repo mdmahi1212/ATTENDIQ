@@ -135,6 +135,20 @@ def main(argv: list[str] | None = None) -> int:
         body_exit = BodyExitTracker(cfg.exit.line_a, cfg.exit.line_b, cfg.exit.out_side, gallery, gate.memory,
                                     exit_gate.cfg.thresholds,
                                     lambda sid, payload: _eg.report_out(sid, payload, t=time.monotonic()))
+    room_watch = None
+    if exit_gate:  # the room camera's faces: who is really in the room (rules B, C, E)
+        from edge.roomwatch import RoomWatcher
+
+        def _room_event(et: EventType, payload: dict[str, Any]) -> None:
+            if gate.session_id is not None:
+                emit(Envelope(event_type=et, source_device_id=device_id, session_id=gate.session_id,
+                              observed_at=server_now(), model_version="buffalo_l / room", payload=payload))
+
+        room_watch = RoomWatcher(gallery, exit_gate.cfg.thresholds,
+                                 lambda sid: _room_event(EventType.ROOM_SEEN, {"student_id": sid}),
+                                 lambda score: _room_event(EventType.ROOM_UNKNOWN_FACE, {"best_score": score}),
+                                 cfg.exit.min_face_px)
+
     from edge.geometry_sync import SnapshotSender
     from edge.geometry_sync import apply as apply_geometry
     from edge.geometry_sync import plan as plan_geometry
@@ -186,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
                 exit_gate.tracker.clear()
             if body_exit:
                 body_exit.reset()
+            if room_watch:
+                room_watch.reset()
             if door_bodies:
                 door_bodies.reset()
             log.info("session %s (%s): gallery %d students", session_id, reason, len(gallery))
@@ -350,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
             pipeline.process(faces, frame.shape[1], frame.shape[0], now)
             if body_exit:
                 body_exit.faces(faces, now)
+            if room_watch:
+                room_watch.update(faces, now)
             if liveview and liveview.due("exit"):
                 from edge.liveview import draw_faces
 

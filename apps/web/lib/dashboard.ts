@@ -56,3 +56,8 @@ export function insideAt(times: Map<string, TimeInClass>, t: number): number {
   for (const v of times.values()) if (v.segments.some((s) => s.from <= t && t < s.to)) n++;
   return n;
 }
+
+/** ISO time `minutes` before now (server components: keeps the clock read out of render). */
+export function minutesAgoIso(minutes: number, now: Date = new Date()): string {
+  return new Date(now.getTime() - minutes * 60_000).toISOString();
+}

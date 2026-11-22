@@ -55,6 +55,8 @@ class Gallery:
         if not self._owner:
             return Match(None, 0.0, 0.0)
         v = emb.astype(np.float32)
+        if not np.isfinite(v).all():  # a broken crop must never crash the camera loop
+            return Match(None, 0.0, 0.0)
         v = v / (float(np.linalg.norm(v)) or 1.0)
         sims = self._m @ v
         best: dict[str, float] = {}

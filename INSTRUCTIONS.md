@@ -119,6 +119,10 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
      | Door (phone 1) | recognised → present / late (LED green); unknown face, or a **photo / phone screen of a face** (anti-spoof check) → LED red, not marked | "someone entered without a face" logged, LED red; the room count catches them |
      | Room (phone 2), someone walks out | that student is OUT → absent at the end if they never come back | if their face was seen earlier in class: still that student (absent if not back); never seen: "someone left", professor gets the count alert near the end |
    Double-clicking it again is safe: parts that already run are reused.
+   Anti-cheating rules (room camera):
+   - marked at the door but **never seen in the room** → "not seen in room" (professor reviews; status kept),
+   - **self-verified** on the phone but not seen in the room within 10 min → same,
+   - an **unknown face sitting in the room** → the professor gets "Unknown person in the room" (no picture stored).
 3. Real classes start by themselves from the timetable. For a live demo: **Admin → Demo → IOT401-01 →**
    5 / 10 / 15 min (short clock) or **Full class** (normal rules).
 4. To stop everything: close the four windows (broker, face-api, ingest, edge).

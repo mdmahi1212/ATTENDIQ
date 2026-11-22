@@ -52,6 +52,7 @@ Where this file and the spec disagree, THIS FILE wins (it contains later correct
 8. Keep files small and typed. No `any` in TypeScript unless commented why. Python uses type hints and `ruff`.
 9. Ask the user before: adding a new paid service, changing a locked decision, deleting data, or anything that needs their accounts/keys.
 10. The dev machine is Windows. Write PowerShell-compatible scripts (`scripts/*.ps1`) and use `pathlib` in Python. Avoid paths with spaces for the repo (recommend `C:\dev\smart-attendance`).
+11. `INSTRUCTIONS.md` is the user's single to-do list (past / present / future). Whenever something needs the user (a click on GitHub or Vercel, a key, a phone, a recording, a test step), add it there; move finished items to "Done" with the date; keep "Do now" in order. Update it in the same commit as the change that needs it.
 
 ## Commands (fill in as they are created)
 - Web: `cd apps/web; npm run dev | npm run lint | npm run typecheck | npm test | npm run build | npm run e2e` (use `npm.cmd` / `npx.cmd` in PowerShell)

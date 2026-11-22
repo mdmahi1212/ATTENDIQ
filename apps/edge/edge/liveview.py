@@ -24,6 +24,7 @@ from edge.geometry import Box
 log = logging.getLogger("edge.liveview")
 
 GREEN, RED, GREY, AMBER = (60, 180, 60), (40, 40, 220), (150, 150, 150), (0, 160, 230)
+BODY = (230, 150, 40)  # BGR blue: body boxes (YOLO)
 
 
 def face_label(face: FaceDet, gallery: Gallery, memory: SessionMemory, thr: Thresholds) -> tuple[str, tuple[int, int, int]]:
@@ -58,6 +59,18 @@ def draw_faces(frame: np.ndarray, faces: Sequence[FaceDet], gallery: Gallery, me
         cv2.rectangle(out, (x1, max(0, y1 - th - 12)), (x1 + tw + 10, y1), colour, -1)
         cv2.putText(out, text, (x1 + 5, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     _caption(out, f"{title} | faces: {len(faces)} | InsightFace buffalo_l")
+    return out
+
+
+def draw_bodies(frame: np.ndarray, boxes: Sequence[Box]) -> np.ndarray:
+    """Thin blue body boxes under the face boxes (door camera)."""
+    import cv2
+
+    out = frame.copy()
+    for b in boxes:
+        x1, y1, x2, y2 = (int(v) for v in b)
+        cv2.rectangle(out, (x1, y1), (x2, y2), BODY, 2)
+        cv2.putText(out, "person", (x1 + 5, y2 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, BODY, 2)
     return out
 
 
@@ -197,10 +210,11 @@ figure{margin:0}img{width:100%;border-radius:8px;background:#222}figcaption{font
 <span class="k" style="background:#3cb43c"></span>recognised
 <span class="k" style="background:#dc2828"></span>unknown
 <span class="k" style="background:#e6a000"></span>left
-<span class="k" style="background:#969696"></span>too small / not counted</h1>
+<span class="k" style="background:#969696"></span>too small / not counted
+<span class="k" style="background:#2896e6"></span>body</h1>
 <div class="grid">
-<figure><img src="/gate.mjpg" alt="door camera"><figcaption>Door camera: face detection + recognition (InsightFace)</figcaption></figure>
-<figure><img src="/inside.mjpg" alt="room camera"><figcaption>Room camera: people detection + count (YOLO)</figcaption></figure>
+<figure><img src="/gate.mjpg" alt="door camera"><figcaption>Door camera: faces (InsightFace) + bodies (YOLO, blue)</figcaption></figure>
+<figure><img src="/inside.mjpg" alt="room camera"><figcaption>Room camera: bodies + count (YOLO); faces for who leaves</figcaption></figure>
 <figure><img src="/exit.mjpg" alt="way-out camera"><figcaption>Way-out camera: recognising people who leave (if enabled)</figcaption></figure>
 <figure class="led"><div class="box"><div id="led" class="bulb"></div><div><b>ESP32 door LED</b> (simulated, no board)<br>
 <span id="ledtxt">waiting</span></div></div><figcaption>Green = recognised at the door · Red = unknown face · Amber = someone left</figcaption></figure>

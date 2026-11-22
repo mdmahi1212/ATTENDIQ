@@ -48,6 +48,10 @@ class GateYaml(BaseModel):
     min_travel_px: float = 25
     entry_mode: str = "line"
     presence_min_s: float = 0.6
+    # Also follow BODIES (YOLO) at the door: someone who walks in with no face ever visible is reported as an
+    # unknown entry (LED red). Uses the inside camera's YOLO weights.
+    body_tracking: bool = True
+    body_min_s: float = 1.0
     accept: float = 0.45
     margin: float = 0.08
     min_votes: int = 2

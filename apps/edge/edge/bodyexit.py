@@ -1,4 +1,6 @@
-"""Exit by BODY: catches people who leave without showing their face to the inside camera.
+"""Bodies as well as faces on both cameras.
+
+BodyExitTracker (inside camera) - exit by BODY: catches people who leave without showing their face.
 
 The inside camera already finds every person's body (YOLO) and every visible face (InsightFace). This tracker
 follows each body box over time and remembers whose face was seen inside it (the face's centre in the upper part
@@ -10,6 +12,8 @@ toward the door it reports an OUT:
   room count drops, so the professor's count check still catches it.
 
 A student whose face the exit camera already reported as OUT is not reported twice.
+
+DoorBodyWatcher (door camera): a person walking in whose face is never found is reported as an unknown entry.
 """
 
 from __future__ import annotations
@@ -121,3 +125,42 @@ class BodyExitTracker:
             return
         self.stats["out_known" if sid else "out_unknown"] += 1
         self._report(sid, {"body_track_id": track_id, "via": "body", "face_votes": dict(who.votes)})
+
+
+class DoorBodyWatcher:
+    """Door camera: follows BODIES as well as faces. A person who walks in while no face is ever found inside their
+    body box (head down, hood, turned away) is reported as an unknown entry (LED red), instead of passing unseen.
+    People whose face was found are left to the face pipeline (recognised or unknown face)."""
+
+    def __init__(self, report: Callable[[dict[str, object]], None], min_seen_s: float = 1.0) -> None:
+        self._report, self.min_seen_s = report, min_seen_s
+        self.tracker = IouTracker(iou_min=0.2, max_missed=6, keep_embeddings=0)
+        self._face_seen: dict[int, bool] = {}
+        self.stats = {"bodies": 0, "no_face_entries": 0}
+
+    def reset(self) -> None:
+        self.tracker.clear()
+        self._face_seen.clear()
+
+    def update(self, bodies: Sequence[Box], faces: Sequence[FaceDet], t: float) -> None:
+        touched, ended = self.tracker.update([(b, 0.0, None) for b in bodies], t)
+        for tr in touched:
+            if tr.track_id not in self._face_seen:
+                self._face_seen[tr.track_id] = False
+                self.stats["bodies"] += 1
+            x1, y1, x2, y2 = tr.box
+            if any(x1 <= (f.box[0] + f.box[2]) / 2 <= x2 and y1 <= (f.box[1] + f.box[3]) / 2 <= y2 for f in faces):
+                self._face_seen[tr.track_id] = True
+        for tr in ended:
+            face_seen = self._face_seen.pop(tr.track_id, True)
+            if not face_seen and tr.last_seen - tr.first_seen >= self.min_seen_s:
+                self.stats["no_face_entries"] += 1
+                self._report({"body_track_id": tr.track_id, "via": "body", "face": "not seen",
+                              "seconds": round(tr.last_seen - tr.first_seen, 1)})
+
+    def flush(self) -> None:
+        """Decide bodies still in view (shutdown / session end)."""
+        for tr in self.tracker.clear():
+            if not self._face_seen.pop(tr.track_id, True) and tr.last_seen - tr.first_seen >= self.min_seen_s:
+                self.stats["no_face_entries"] += 1
+                self._report({"body_track_id": tr.track_id, "via": "body", "face": "not seen"})

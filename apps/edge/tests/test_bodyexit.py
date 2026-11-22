@@ -86,3 +86,44 @@ def test_gate_dedupes_an_unknown_body_out_right_after_a_face_out() -> None:
     assert not pipe.report_out(None, {"via": "body"}, t=11.0)  # same person seen by the body tracker
     assert pipe.report_out(None, {"via": "body"}, t=20.0)  # someone else, later
     assert [e.payload.get("student_id") for e in events] == ["stu-a", None]
+
+
+# ---------------------------------------------------------------- door camera: bodies + faces
+def door_walk(w, xs: list[float], with_face: bool, t0: float = 0.0) -> None:  # noqa: ANN001
+    for i, x in enumerate(xs):
+        faces = [FaceDet((x - 25, 120, x + 25, 180), 0.9, None)] if with_face else []
+        w.update([body(x)], faces, t0 + i * 0.2)
+    for k in range(8):  # gone from the picture -> track ends
+        w.update([], [], t0 + (len(xs) + k) * 0.2)
+
+
+def test_door_reports_a_person_whose_face_never_showed() -> None:
+    from edge.bodyexit import DoorBodyWatcher
+
+    reports: list[dict] = []
+    w = DoorBodyWatcher(reports.append, min_seen_s=1.0)
+    door_walk(w, list(range(100, 400, 40)), with_face=False)  # head down for the whole walk
+    assert len(reports) == 1 and reports[0]["face"] == "not seen"
+
+
+def test_door_leaves_people_with_a_face_to_the_face_pipeline_and_ignores_glimpses() -> None:
+    from edge.bodyexit import DoorBodyWatcher
+
+    reports: list[dict] = []
+    w = DoorBodyWatcher(reports.append, min_seen_s=1.0)
+    door_walk(w, list(range(100, 400, 40)), with_face=True)  # face found -> recognised or unknown by face
+    door_walk(w, [300, 320], with_face=False, t0=10.0)  # 0.4 s in view: too short to count
+    assert reports == []
+
+
+def test_gate_reports_unknown_entry_with_red_led() -> None:
+    from edge.gate import GateConfig
+
+    events: list[Envelope] = []
+    fb: list[str] = []
+    pipe = GatePipeline(GateConfig(), Gallery(), uuid.UUID(int=1), events.append, fb.append,
+                        clock=lambda: datetime(2026, 11, 23, tzinfo=UTC))
+    pipe.report_unknown_entry({"via": "body"})  # no class running: ignored
+    pipe.start(uuid.uuid4(), GALLERY)
+    pipe.report_unknown_entry({"via": "body", "face": "not seen"})
+    assert [e.event_type.value for e in events] == ["GATE_ENTRY_UNKNOWN"] and fb == ["unknown"]

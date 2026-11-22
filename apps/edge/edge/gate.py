@@ -132,6 +132,15 @@ class GatePipeline:
             d = decide([e for _, e in tr.embeddings], self.gallery, self.cfg.thresholds) if tr.embeddings else None
             self.report_out(d.student_id if d and d.recognised else None, {"track_id": tr.track_id})
 
+    def report_unknown_entry(self, payload: dict[str, Any]) -> None:
+        """Someone walked in but no face was ever found on them (from edge.bodyexit.DoorBodyWatcher)."""
+        if self.session_id is None:
+            return
+        self.stats["unknown"] += 1
+        self._event(EventType.GATE_ENTRY_UNKNOWN, payload)
+        if self._feedback:
+            self._feedback("unknown")
+
     def report_out(self, student_id: str | None, payload: dict[str, Any], t: float | None = None,
                    dedupe_unknown_s: float = 3.0) -> bool:
         """GATE_PERSON_OUT (face crossing, or a body crossing from edge.bodyexit). An unidentified OUT right after

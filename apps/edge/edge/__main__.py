@@ -171,6 +171,8 @@ def main(argv: list[str] | None = None) -> int:
                 exit_gate.tracker.clear()
             if body_exit:
                 body_exit.reset()
+            if door_bodies:
+                door_bodies.reset()
             log.info("session %s (%s): gallery %d students", session_id, reason, len(gallery))
 
     if client:
@@ -231,11 +233,34 @@ def main(argv: list[str] | None = None) -> int:
     log.info("detector ready on %s; room %s; source %s; mode %s; rotate %s", detector.device, room, source,
              gate_cfg.entry_mode, args.rotate if args.rotate is not None else cfg.gate.rotate)
 
-    def occupancy_loop(cam: Camera) -> None:
-        from edge.occupancy import OccupancyCounter, YoloPersonDetector, annotate, in_roi
+    # One YOLO person model shared by the door camera (bodies) and the room camera (count + bodies at the exit).
+    yolo_lock = threading.Lock()
+    yolo_holder: dict[str, Any] = {}
 
-        yolo = YoloPersonDetector(str(resolve(env.yolo_weights)) if resolve(env.yolo_weights).exists() else env.yolo_weights,
-                                  cfg.inside.conf, cfg.inside.device)
+    def yolo_model() -> Any:
+        with yolo_lock:
+            if "m" not in yolo_holder:
+                from edge.occupancy import YoloPersonDetector
+
+                w = str(resolve(env.yolo_weights)) if resolve(env.yolo_weights).exists() else env.yolo_weights
+                yolo_holder["m"] = YoloPersonDetector(w, cfg.inside.conf, cfg.inside.device)
+            return yolo_holder["m"]
+
+    def person_boxes(frame: Any) -> list[Any]:
+        model = yolo_model()
+        with yolo_lock:
+            return model(frame)
+
+    door_bodies = None
+    if cfg.gate.body_tracking:
+        from edge.bodyexit import DoorBodyWatcher
+
+        door_bodies = DoorBodyWatcher(gate.report_unknown_entry, cfg.gate.body_min_s)
+
+    def occupancy_loop(cam: Camera) -> None:
+        from edge.occupancy import OccupancyCounter, annotate, in_roi
+
+        yolo = yolo_model()
         counter = OccupancyCounter(cfg.inside.window, cfg.inside.stable_count_seconds)
         session_seen = None
         next_pub = next_count = 0.0
@@ -253,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
             _, frame, _ = cam.latest()
             if frame is not None and gate.session_id is not None:
                 frame = rotate_frame(frame, cfg.inside.rotate)
-                boxes = yolo(frame)
+                boxes = person_boxes(frame)
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
                 if body_exit:  # all bodies, not only seated ones: people walking to the door leave the seat area
                     body_exit.update(boxes, frame.shape[1], frame.shape[0], time.monotonic())
@@ -355,6 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
     last_seq, n = -1, 0
+    next_body, last_bodies = 0.0, []
     demo_started = False
     if args.demo:
         log.info("demo: waiting for a live class in room %s (start it on the website)", room)
@@ -379,11 +405,19 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             frame = rotate_frame(frame, rotation)
             faces = detect(frame)
-            gate.process(faces, frame.shape[1], frame.shape[0], time.monotonic())
+            now = time.monotonic()
+            gate.process(faces, frame.shape[1], frame.shape[0], now)
+            bodies: list[Any] = []
+            if door_bodies and now >= next_body:
+                next_body = now + 0.2  # bodies at ~5 fps are enough to follow a walk
+                bodies = person_boxes(frame)
+                door_bodies.update(bodies, faces, now)
+                last_bodies = bodies
             if liveview and liveview.due("gate"):
-                from edge.liveview import draw_faces
+                from edge.liveview import draw_bodies, draw_faces
 
-                liveview.update("gate", draw_faces(frame, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera"))
+                img = draw_bodies(frame, last_bodies) if door_bodies else frame
+                liveview.update("gate", draw_faces(img, faces, gallery, gate.memory, gate.cfg.thresholds, "door camera"))
     except KeyboardInterrupt:
         pass
     finally:
@@ -391,6 +425,8 @@ def main(argv: list[str] | None = None) -> int:
         camera.stop()
         if inside_cam:
             inside_cam.stop()
+        if door_bodies:
+            door_bodies.flush()  # someone still in view at shutdown with no face found
         for tr in gate.tracker.clear():  # decide tracks still open at shutdown
             if tr.direction == "in" and not tr.decided:
                 gate._decide(tr)

@@ -70,3 +70,7 @@ Progress:
   Body exit (edge/bodyexit.py, exit.body_tracking true, line mode + inside enabled): YOLO body tracks carry the identity
   of faces seen inside them (>=2 sightings); body crossing the exit line -> GATE_PERSON_OUT (student or unknown);
   GatePipeline.report_out dedupes unknown OUT within 3 s of another OUT. 49 edge tests. NOT verified with real people.
+- 2026-11-23 user decisions: (1) body-named exits stay (face seen earlier in class -> body crossing exit = that student
+  OUT -> absent if not back), accepted risk of swapped tracks; (2) door camera tracks bodies too: DoorBodyWatcher ->
+  GATE_ENTRY_UNKNOWN {via body, face not seen} + LED red when a body >=1 s never shows a face. One shared YOLO model
+  (lock) for door + room. Edge 52 tests; restarted OK. NOT verified with real people.

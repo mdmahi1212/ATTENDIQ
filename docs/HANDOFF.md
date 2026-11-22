@@ -58,3 +58,5 @@ Progress:
   how-to (live phones or recorded videos). DB: create_adhoc_session allows 5..240 min (migration
   20261122181258, applied; checked in a rolled-back test). Sections page button removed (moved to Demo).
   Checks: web unit 131, tsc, lint, build; page checked desktop + 375 px. Start buttons NOT clicked (would start a real class).
+- 2026-11-23 INSTRUCTIONS.md has 5-person plans for a 10-min and a 5-min class. When making apps/edge/config.demo.yaml
+  for the recordings, set inside.stable_count_seconds ~20 (config.yaml has 60; too slow for the 5-min class).

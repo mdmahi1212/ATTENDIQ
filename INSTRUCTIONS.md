@@ -45,6 +45,25 @@ Good light on faces. No window behind the people (backlight hides faces). All 5 
 Rules: walk one at a time at normal speed, look at phone 1 when walking in (except Person 4), sit still,
 nobody else walks through either picture.
 
+### Short version: 5-minute class (same people, same phone places, about 4¾ min)
+Film this as a **second pair of videos** (e.g. `C:\videos\door5.mp4` and `room5.mp4`). Timing is tight, so walk exactly on time.
+
+| Video time | Who | Does | Result in the system |
+|---|---|---|---|
+| 0:00 | — | both phones recording; nobody in view | class starts |
+| 0:10 | **Person 1** | walks in facing phone 1, sits | **present** |
+| 0:20 | **Person 2** | walks in, sits | **present** |
+| 0:30 | **Person 3** | walks in, sits | **present** |
+| 0:40 | **Person 4** | walks in **looking down** (face hidden), sits | not marked |
+| 1:00 | — | — | **"Verify now"** to students not marked (open for 2 min) |
+| 1:30 | **Person 5** | walks in facing phone 1, sits | **late** |
+| 1:50 | **Person 3** | walks **out** past phone 2, does **not** come back | 3:00: professor gets **"Count does not match"**; end: **absent** |
+| 2:20 | **Person 2** | walks **out** past phone 2 | — |
+| 2:40 | **Person 2** | walks back **in** facing phone 1, sits | stays **present** |
+| 4:45 | — | stop both phones | — |
+
+In the presentation press **5 min** instead of 10 min. Person 4 must finish "Verify now" before minute 3. Same final result as the 10-minute class.
+
 ### After filming
 1. Copy both videos to the laptop: `C:\videos\door.mp4` (phone 1) and `C:\videos\room.mp4` (phone 2).
 2. Tell Claude "videos ready". Claude checks one frame of each and sets the rotation and the exit line
@@ -59,7 +78,7 @@ nobody else walks through either picture.
    powershell -ExecutionPolicy Bypass -File scripts\run-video-demo.ps1 -Door C:\videos\door.mp4 -Room C:\videos\room.mp4
    ```
    It says "waiting for a live class". The live camera view opens at http://127.0.0.1:8090 (refresh it after ~10 s).
-2. Website (https://attendiq-rho.vercel.app) as admin: **Admin → Demo → IOT401-01 → 10 min**, confirm.
+2. Website (https://attendiq-rho.vercel.app) as admin: **Admin → Demo → IOT401-01 → 10 min** (or **5 min** for the short videos), confirm.
    Both videos start within ~2 s.
 3. On the screen: the live camera view (boxes + names) and **Live dashboard** of the class (from Admin → Demo → Running now).
 4. About 2–3 min in, **Person 4's phone gets "Verify now"**. Person 4 opens it, does the face check and scans the

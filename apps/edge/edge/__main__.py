@@ -5,6 +5,8 @@ Default: reads the gate camera from .env, publishes events over MQTT (SQLite out
                    Playback waits until a session is live in the room, so no frame is wasted.
 --exit-video FILE  play a recording of the way-out (inside) camera at the same time (scenario replays).
 --video-offset S / --exit-offset S  skip the first S seconds of a file, to line the two recordings up.
+--start-session    presentation: start a REAL class in the room when the videos start, end + finalize it when they
+                   finish, print the final statuses (server needs EDGE_REPLAY_SESSIONS=true). [--section IOT401-01]
 --direct      POST events straight to the web API instead of MQTT (no broker needed; still uses the outbox).
 """
 
@@ -41,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--exit-video", help="video file instead of the live inside / way-out camera (needs --video)")
     ap.add_argument("--video-offset", type=float, default=0.0, help="skip the first S seconds of --video")
     ap.add_argument("--exit-offset", type=float, default=0.0, help="skip the first S seconds of --exit-video")
+    ap.add_argument("--start-session", action="store_true",
+                    help="start a real class when the videos start and end it when they finish (needs --video)")
+    ap.add_argument("--section", help="section for --start-session, e.g. IOT401-01 (default: the room's main section)")
     ap.add_argument("--direct", action="store_true", help="POST events to the API instead of MQTT")
     ap.add_argument("--presence", action="store_true", help="entry_mode=presence (overrides config.yaml)")
     ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], help="rotate gate frames clockwise (overrides config.yaml)")
@@ -49,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.exit_video and not args.video:
         ap.error("--exit-video needs --video (both recordings are replayed together)")
+    if args.start_session and not args.video:
+        ap.error("--start-session needs --video")
 
     env = Env()  # type: ignore[call-arg]
     cfg = load_yaml(env.edge_config_path)
@@ -332,9 +339,27 @@ def main(argv: list[str] | None = None) -> int:
 
     rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
+    replay_session: str | None = None
+    if args.start_session:
+        from edge.replay import class_minutes, video_seconds
+
+        length = max(video_seconds(camera.source, args.video_offset),
+                     video_seconds(inside_source, args.exit_offset) if inside_cam and args.exit_video else 0.0)
+        try:
+            res = api.replay_session(class_minutes(length), args.section)
+        except EdgeApiError as e:
+            log.error("could not start the class: %s", e)
+            stop.set()
+            camera.stop()
+            return 2
+        replay_session = str(res["session_id"])
+        log.info("class started: %s, section %s, %d students with a face; videos %.0f s",
+                 replay_session, res.get("section"), res.get("students_with_face", 0), length)
+        set_session(replay_session, "replay")
+
     last_seq, n = -1, 0
     playing = not args.video
-    if args.video:
+    if args.video and gate.session_id is None:
         log.info("waiting for a live session in %s before playing the recording(s)", room)
     try:
         while not stop.is_set():
@@ -374,11 +399,31 @@ def main(argv: list[str] | None = None) -> int:
                 gate._decide(tr)
         if args.direct:
             publisher.replay()
+        if replay_session:
+            finished = camera.ended
+            if finished:
+                from edge.replay import wait_until_sent
+
+                if not wait_until_sent(outbox.pending_count, publisher.replay if args.direct else None):
+                    log.warning("%d events still unsent; ending the class anyway", outbox.pending_count())
+                if not args.direct:
+                    time.sleep(5)  # MQTT -> ingest -> API batches
         if client:
             time.sleep(1)
             client.loop_stop()
             client.disconnect()
         log.info("stopped; stats %s; unsent %d", json.dumps(gate.stats), outbox.pending_count())
+        if replay_session:
+            if not camera.ended:
+                log.warning("interrupted: class %s is still live; end it on the live page", replay_session)
+            else:
+                from edge.replay import print_results
+
+                try:
+                    print_results(api.end_replay_session(replay_session))
+                except EdgeApiError as e:
+                    log.error("could not end the class (end it on the live page): %s", e)
+                    return 1
     return 0
 
 

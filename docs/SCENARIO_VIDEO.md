@@ -42,45 +42,56 @@ Open each file in any player and note the second of the clap (e.g. phone 1 at 3.
 Skip the earlier part of the one that started first, so both start at the clap:
 `--video-offset 3.4 --exit-offset 1.2`.
 
-## Replay on the laptop
+## Presentation mode: one command, the class starts and ends with the videos
 
-1. Copy the files to `apps/edge/samples/` (gitignored: faces), e.g. `scene-in.mp4` and `scene-out.mp4`.
-2. `apps/edge/config.yaml`: `exit.enabled: true`, `exit.mode: presence`; `inside.enabled: false`;
-   `gate.rotate: 0` and `inside.rotate: 0` for landscape files (the live phone rotations do NOT apply to files).
-   Optional: `liveview.enabled: true` to watch the boxes and names at http://127.0.0.1:8090.
-3. Start a live session in B204: Admin → Sections → **Start 30-min test session** (or "Demo: class started
-   12 min ago" to make every arrival `late`).
-4. Run (no broker needed with `--direct`):
+```powershell
+cd apps\edge
+.\.venv\Scripts\python.exe -m edge --direct --presence --start-session --section IOT401-01 `
+  --video samples\scene-in.mp4 --video-offset 3.4 `
+  --exit-video samples\scene-out.mp4 --exit-offset 1.2
+```
 
-   ```powershell
-   cd apps\edge
-   .\.venv\Scripts\python.exe -m edge --direct --presence `
-     --video samples\scene-in.mp4 --video-offset 3.4 `
-     --exit-video samples\scene-out.mp4 --exit-offset 1.2
+What happens:
+1. The edge reads the video length and starts a **real** class for the section in its room (scheduled for the
+   video length + 2 min, at least 10 min). Real students get `pending` rows, exactly like a timetable class.
+2. Both videos start at that same moment and play at real-time speed through the full pipeline (face detection,
+   tracking, recognition votes, door events → API → rule engine). Open the professor's **Live dashboard** and
+   watch statuses change while the video plays.
+3. When both videos finish, the edge waits until every event has reached the server, then **ends + finalizes**
+   the class (leaving-and-never-returning → `absent`, never came → `absent`) and prints the final table:
+
+   ```
+   Final attendance
+   Student  Status    Flags / note
+   A        present
+   B        present
+   C        absent    left_no_return  left at 10:02 and did not come back
+   D        absent
+   Unknown people at the door: 1
    ```
 
-   The edge waits until it sees the session, then starts BOTH files together at real-time speed and exits
-   when both have ended.
-5. Watch the professor's **Live dashboard** for the class (door timeline, statuses). Then press **End session**
-   and check the final statuses above.
-6. For the presentation video, screen-record the live dashboard (and the 8090 live view) during the replay.
+One-time setup:
+- **Server switch** (off by default, because it lets the laptop's device key start and end real classes):
+  `EDGE_REPLAY_SESSIONS=true` in `apps/web/.env.local`, then `node scripts/push-vercel-env.mjs` and redeploy
+  (or set it in Vercel → Project → Settings → Environment Variables). Set it back to `false` after presenting.
+- `apps/edge/config.yaml`: `exit.enabled: true`, `exit.mode: presence`; `inside.enabled: false`;
+  `gate.rotate: 0` and `inside.rotate: 0` for landscape files (the live phone rotations do NOT apply to files).
+  Optional: `liveview.enabled: true` to show the boxes and names at http://127.0.0.1:8090.
+- Copy the files to `apps/edge/samples/` (gitignored: faces).
 
-Re-run: Admin → reset demo data (`scripts\reset-demo.ps1`) or start a new test session; every session starts
-with an empty "who is inside" memory.
+Good to know:
+- **Every real student enrolled in that section** who is not in the video ends `absent` and gets a "Marked absent"
+  notification. For the presentation use a section that only contains your friends (or warn the others).
+- No other real class may be live in the room (the edge stops with "another live session is running").
+- Ctrl+C during playback leaves the class live; end it on the live page.
+- All arrivals in the first 10 minutes are `present`. Recheck alerts (T_end − 5) do not happen in such a short
+  class; for recheck, press **Start recheck** on the live page during the replay (needs a real phone).
+- The end of a recording is not reported as a camera failure, so the device-health check at the end passes and
+  no-shows become `absent` instead of `needs_review`.
+- Without `--start-session` the edge waits for a class you started on the website and you end it yourself.
 
-## A short class (5–10 minutes)
-
-- Start **Start 30-min test session** and simply press **End session** on the live page after 5–10 minutes:
-  End session finalizes at once (statuses above), you do not have to wait for the 30 minutes.
-- Within the first 10 minutes (`present_until_min`) every recognised arrival is `present`. To show `late`, use
-  "Demo: class started 12 min ago" instead (arrivals then fall in the 10–30 min late window).
-- With `--direct` the edge finds the session by polling every 15 s, so playback starts up to 15 s after you start
-  the session. Start the session first, then the edge (or the other way round: the edge waits).
-- When the recordings end the edge exits WITHOUT reporting the cameras offline (a finished file is not a camera
-  failure; otherwise the downtime check at End session would put the never-came student in `needs_review`
-  instead of `absent`). You can press End session any time after the edge has finished.
-- The professor's end-of-class count alert (T_end − 5 min) does not fire when you end a 30-min session early;
-  that is expected.
+Re-run: just run the command again (each run is a new class with an empty "who is inside" memory). Clean up old
+runs with `scripts\reset-demo.ps1`.
 
 ## Optional: phone verification in the same video
 

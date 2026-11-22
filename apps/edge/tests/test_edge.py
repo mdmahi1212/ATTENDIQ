@@ -382,3 +382,43 @@ def test_exit_camera_in_presence_mode_marks_any_recognised_face_as_out() -> None
     pipe.start(uuid.uuid4(), GALLERY)
     walk(pipe, lambda i: near(A, 0.7, 100 + i), [240] * 10)  # stands in front of the way-out camera
     assert types(events) == ["GATE_PERSON_OUT"] and events[0].payload["student_id"] == "stu-a"
+
+
+# ---------------------------------------------------------------- recorded-video presentation
+def test_class_minutes_covers_the_videos_with_db_minimum() -> None:
+    from edge.replay import class_minutes
+
+    assert class_minutes(0) == 10 and class_minutes(150) == 10 and class_minutes(9 * 60) == 11
+    assert class_minutes(4 * 3600) == 60
+
+
+def test_video_seconds_reads_the_file_length(tmp_path) -> None:  # noqa: ANN001
+    import cv2
+
+    from edge.replay import video_seconds
+
+    p = str(tmp_path / "v.mp4")
+    w = cv2.VideoWriter(p, cv2.VideoWriter_fourcc(*"mp4v"), 20, (32, 32))
+    for _ in range(100):
+        w.write(np.zeros((32, 32, 3), np.uint8))
+    w.release()
+    assert abs(video_seconds(p) - 5.0) < 0.2 and abs(video_seconds(p, 2.0) - 3.0) < 0.2
+    assert video_seconds(str(tmp_path / "missing.mp4")) == 0.0
+
+
+def test_wait_until_sent_flushes_until_the_outbox_is_empty() -> None:
+    from edge.replay import wait_until_sent
+
+    left = [3]
+    assert wait_until_sent(lambda: left[0], lambda: left.__setitem__(0, left[0] - 1), sleep=lambda _s: None)
+    assert not wait_until_sent(lambda: 1, None, timeout_s=0.0, sleep=lambda _s: None)
+
+
+def test_result_table_lists_every_student() -> None:
+    from edge.replay import format_results
+
+    out = format_results({"unknown_entries": 1, "attendance": [
+        {"name": "Mahi", "status": "present", "flags": [], "note": None},
+        {"name": "Fahim", "status": "absent", "flags": ["left_no_return"], "note": "left at 10:02 and did not come back"},
+    ]})
+    assert "Mahi" in out and "left_no_return" in out and "did not come back" in out and "door: 1" in out

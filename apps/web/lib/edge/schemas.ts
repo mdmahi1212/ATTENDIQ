@@ -38,4 +38,17 @@ export const demoSessionSchema = z.object({
   minutes: z.number().int().min(10).max(240).default(75),
 });
 
+/** Recorded-video presentation: the edge starts a REAL class for its room, replays the videos, then ends it. */
+export const replaySessionSchema = z.object({
+  /** "IOT401-01" (course code + section no). Default: the room's section with the most real students with an active face. */
+  section: z.string().regex(/^[A-Za-z0-9]{1,20}-[A-Za-z0-9]{1,10}$/).optional(),
+  /** Scheduled length; the edge ends it early when the videos finish. DB minimum is 10. */
+  minutes: z.number().int().min(10).max(60).default(10),
+});
+
+/** Off unless EDGE_REPLAY_SESSIONS=true on the server: lets an edge device key start and end real classes. */
+export function replaySessionsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.EDGE_REPLAY_SESSIONS === "true";
+}
+
 export type RpcBatchResult = { accepted: number; duplicates: number; rejected: { event_id: string | null; reason: string }[] };

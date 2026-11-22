@@ -1,0 +1,23 @@
+# Demo settings (copied to settings.yaml on the first run; edit settings.yaml, not this file).
+
+# Class the demo runs as. Every enrolled student who is not in the videos ends absent.
+section: IOT401-01
+
+# People in phone 2's view who are not students (a friend playing the professor). 0 if nobody.
+staff: 1
+
+# If a video looks sideways in the live view (http://127.0.0.1:8090): 90, 180 or 270 (clockwise).
+door_rotate: 0
+room_rotate: 0
+
+# Exit line in phone 2's picture (0 = left / top, 1 = right / bottom). Shown in amber in the live view.
+# Put it between the seats and the door: people going out cross it, nobody sitting does.
+exit_line: [[0.25, 0.0], [0.25, 1.0]]   # a vertical line at 25 % from the left
+door_side: left                          # where the door is in phone 2's picture: left / right / top / bottom
+
+# Where people sit in phone 2's picture (only people whose feet are inside are counted).
+seat_area: [[0.0, 0.3], [1.0, 0.3], [1.0, 1.0], [0.0, 1.0]]
+
+# Seconds to skip at the start of a video, if one phone started recording much earlier. Usually 0.
+door_offset: 0
+room_offset: 0

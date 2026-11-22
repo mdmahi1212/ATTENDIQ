@@ -29,6 +29,7 @@ __pycache__/
 *.key
 firmware/esp32-door-led/secrets.h
 apps/edge/config.yaml
+apps/edge/data/
 
 # --- Local data / queues / logs ---
 *.db
@@ -65,3 +66,9 @@ desktop.ini
 !.vscode/extensions.json
 *.db-shm
 *.db-wal
+
+# --- Recorded demo (faces) ---
+demo/*
+!demo/README.md
+!demo/settings.example.yaml
+!demo/*.bat

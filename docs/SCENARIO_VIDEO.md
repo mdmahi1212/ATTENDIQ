@@ -1,5 +1,9 @@
 # Scenario video: friends walk in, leave, come back (recorded, replayed into a live class)
 
+**Easiest way:** put `door.mp4` (phone 1) and `room.mp4` (phone 2) in the repo's `demo\` folder and double-click
+`demo\run-quick-test.bat` or `demo\run-full-demo.bat` (see `demo\README.md`). The rest of this page explains
+what those do and how to film.
+
 Two phones record the scene at the same time, exactly where they stand in the live setup. Later the edge plays
 both recordings into a live session as if they were the cameras. The system makes every decision itself:
 present, unknown, left and came back, left and never came back (absent).

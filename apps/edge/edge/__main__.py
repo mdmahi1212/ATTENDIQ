@@ -376,8 +376,10 @@ def main(argv: list[str] | None = None) -> int:
 
         length = max(video_seconds(c.source, c.skip_s) for c in recordings)
         minutes = full_class_minutes(length, args.class_minutes) if args.full_class else class_minutes(length)
-        if args.full_class and room_cam is None:
-            log.warning("no --room-video: there is no room count, so the count checks and the professor alert cannot happen")
+        counting = room_cam is not None or (inside_cam is not None and cfg.inside.enabled)
+        if args.full_class and not counting:
+            log.warning("no room count (inside.enabled is off and no --room-video): the count checks and the "
+                        "professor alert cannot happen")
         if args.full_class and length < (minutes - DEMO_END_ALERT_MIN) * 60:
             log.warning("the videos end at %.1f min, before the end-of-class count check at minute %d: the professor "
                         "alert needs a fresh room count then (record longer or pass a smaller --class-minutes)",

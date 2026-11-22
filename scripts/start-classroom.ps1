@@ -34,9 +34,23 @@ foreach ($f in "infra\mosquitto\passwd", "apps\ingest\.env", "apps\edge\.env") {
 }
 
 $busy = Get-NetTCPConnection -LocalPort $MqttPort -State Listen -ErrorAction SilentlyContinue
+$brokerRunning = $false
 if ($busy) {
   $owner = (Get-Process -Id $busy[0].OwningProcess -ErrorAction SilentlyContinue).ProcessName
-  throw "Port $MqttPort is already used by '$owner'. If that is the default Mosquitto Windows service, either run with -MqttPort 1884, or stop it once in an ADMIN PowerShell: Stop-Service mosquitto; Set-Service mosquitto -StartupType Manual"
+  if ($owner -eq "mosquitto" -and $MqttPort -ne 1883) {
+    $brokerRunning = $true  # our own broker from an earlier start: reuse it
+  } else {
+    throw "Port $MqttPort is already used by '$owner'. If that is the default Mosquitto Windows service, either run with -MqttPort 1884, or stop it once in an ADMIN PowerShell: Stop-Service mosquitto; Set-Service mosquitto -StartupType Manual"
+  }
+}
+
+# Parts already running (an earlier start) are reused, so starting twice never doubles a process.
+function Test-PyModule([string]$module) {
+  [bool](Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match "-m $module(\s|$)" })
+}
+function Test-Port([int]$port) {
+  [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
 
 # Runtime copy of the broker config with the chosen port (infra/mosquitto/data is gitignored).
@@ -51,16 +65,19 @@ function Start-Part([string]$title, [string]$dir, [string]$command) {
   Write-Host "started $title  (log: logs\$title.log)"
 }
 
-Start-Part "mosquitto" $repo "& '$mosq' -c '$conf'"
-Start-Sleep -Seconds 2
+if ($brokerRunning) { Write-Host "mosquitto already running on $MqttPort (reused)" }
+else { Start-Part "mosquitto" $repo "& '$mosq' -c '$conf'"; Start-Sleep -Seconds 2 }
 if (-not $NoFaceApi) {
-  Start-Part "face-api" $repo "powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1 -Port $FaceApiPort"
+  if (Test-Port $FaceApiPort) { Write-Host "face-api already running on $FaceApiPort (reused)" }
+  else { Start-Part "face-api" $repo "powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1 -Port $FaceApiPort" }
 }
-Start-Part "ingest" (Join-Path $repo "apps\ingest") ".\.venv\Scripts\python.exe -m ingest"
+if (Test-PyModule "ingest") { Write-Host "ingest already running (reused)" }
+else { Start-Part "ingest" (Join-Path $repo "apps\ingest") ".\.venv\Scripts\python.exe -m ingest" }
 $edgeArgs = ""
 if ($Video) { $edgeArgs += " --video '$((Resolve-Path $Video).Path)'" }
 if ($Presence) { $edgeArgs += " --presence" }
-Start-Part "edge" (Join-Path $repo "apps\edge") ".\.venv\Scripts\python.exe -m edge$edgeArgs"
+if (Test-PyModule "edge") { Write-Host "edge already running (reused)" }
+else { Start-Part "edge" (Join-Path $repo "apps\edge") ".\.venv\Scripts\python.exe -m edge$edgeArgs" }
 
 Write-Host ""
 Write-Host "Classroom stack starting (MQTT port $MqttPort). Watch the 'edge' window for 'session ... gallery N students'." -ForegroundColor Green

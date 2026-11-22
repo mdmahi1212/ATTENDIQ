@@ -100,15 +100,17 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
 
 ---
 
-## 3. Run a live demo with the phones (no videos)
+## 3. Real classes and live demos with the phones: ONE double-click
 
-1. Phone 1: **IP Webcam** → Start server (`192.168.219.100:8080`). iPhone: **IP Camera Lite** → server on (`192.168.219.104:8081`), main camera.
-2. Laptop:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 -MqttPort 1884 -FaceApiPort 8010
-   ```
-3. Website: **Admin → Demo → IOT401-01 →** 5 / 10 / 15 min (short clock) or **Full class** (normal rules).
-4. Live camera view: http://127.0.0.1:8090.
+1. Phone 1: **IP Webcam** → Start server. iPhone: **IP Camera Lite** → server on, main camera. Same Wi-Fi as the laptop.
+2. Double-click **`START-CLASS.bat`** (project folder). By itself it:
+   - checks both phone cameras (says which one is not reachable),
+   - opens a window each for the broker, the face API, ingest and the edge (face + person models on the GPU),
+   - opens the live camera view (http://127.0.0.1:8090) and the website.
+   Double-clicking it again is safe: parts that already run are reused.
+3. Real classes start by themselves from the timetable. For a live demo: **Admin → Demo → IOT401-01 →**
+   5 / 10 / 15 min (short clock) or **Full class** (normal rules).
+4. To stop everything: close the four windows (broker, face-api, ingest, edge).
 
 Demo timing (minutes from the start):
 
@@ -127,7 +129,7 @@ Demo timing (minutes from the start):
 |---|---|
 | Website (production) | https://attendiq-rho.vercel.app — updates by itself after a push to GitHub |
 | Website on the laptop | `cd apps\web; npm.cmd run dev` → http://localhost:3000 |
-| Classroom stack (broker, face-api, ingest, edge) | `powershell -ExecutionPolicy Bypass -File scripts\start-classroom.ps1 -MqttPort 1884 -FaceApiPort 8010` |
+| Classroom stack (broker, face-api, ingest, edge) | double-click `START-CLASS.bat` (or `scripts\start-live.ps1`) |
 | Face API + tunnel only | `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1` |
 | Simulator class (30 fake students) | `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run` |
 | Remove demo / test classes | `powershell -ExecutionPolicy Bypass -File scripts\reset-demo.ps1` (type `RESET`) |

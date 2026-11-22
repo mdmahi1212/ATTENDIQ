@@ -232,6 +232,17 @@ def test_no_seek_without_offset(tmp_path) -> None:  # noqa: ANN001
     assert cam.ended and not hasattr(cap, "sets")
 
 
+def test_end_of_a_replayed_recording_is_not_reported_offline(tmp_path) -> None:  # noqa: ANN001
+    video = tmp_path / "walk.mp4"
+    video.write_bytes(b"")
+    statuses: list[bool] = []
+    cam = Camera("gate", str(video), lambda n, online, f: statuses.append(online), opener=lambda _s: FakeCap(3),
+                 sleep=lambda _s: None, report_end=False)
+    cam.start()
+    cam._thread.join(2)  # type: ignore[union-attr]
+    assert cam.ended and statuses == [True]  # ONLINE once, no OFFLINE (would count as gate downtime)
+
+
 # ---------------------------------------------------------------- gate pipeline end to end
 def walk(pipe: GatePipeline, emb_fn, ys: list[float], x: float = 300, size: float = 120, t0: float = 0.0) -> None:  # noqa: ANN001
     for i, y in enumerate(ys):

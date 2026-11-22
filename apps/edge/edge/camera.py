@@ -54,11 +54,14 @@ class Backoff:
 class Camera:
     def __init__(self, name: str, source: str, on_status: Callable[[str, bool, int], None] | None = None,
                  opener: Callable[[str], Capture] = open_capture, loop_file: bool = False,
-                 sleep: Callable[[float], None] = time.sleep, skip_s: float = 0.0) -> None:
+                 sleep: Callable[[float], None] = time.sleep, skip_s: float = 0.0, report_end: bool = True) -> None:
         self.name, self.source = name, source
         self.skip_s = skip_s  # video files only: start this many seconds into the file (lines up two recordings)
         self._open, self._on_status, self._sleep = opener, on_status, sleep
         self._loop_file = loop_file
+        # False = the end of a recording is not reported as CAMERA_OFFLINE (it is not a failure, and it would
+        # count as gate downtime at finalize and turn absent students into needs_review).
+        self._report_end = report_end
         self._lock = threading.Lock()
         self._frame: np.ndarray | None = None
         self._frame_at = 0.0
@@ -130,7 +133,11 @@ class Camera:
             cap.release()
             if file_mode and not self._loop_file:
                 self.ended = True
-                self._set_online(False)
+                if self._report_end:
+                    self._set_online(False)
+                else:
+                    self.online = False
+                    log.info("camera %s: recording ended", self.name)
                 return
             self.failures += 1
             self._set_online(False)

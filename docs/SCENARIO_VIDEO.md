@@ -68,6 +68,20 @@ Skip the earlier part of the one that started first, so both start at the clap:
 Re-run: Admin → reset demo data (`scripts\reset-demo.ps1`) or start a new test session; every session starts
 with an empty "who is inside" memory.
 
+## A short class (5–10 minutes)
+
+- Start **Start 30-min test session** and simply press **End session** on the live page after 5–10 minutes:
+  End session finalizes at once (statuses above), you do not have to wait for the 30 minutes.
+- Within the first 10 minutes (`present_until_min`) every recognised arrival is `present`. To show `late`, use
+  "Demo: class started 12 min ago" instead (arrivals then fall in the 10–30 min late window).
+- With `--direct` the edge finds the session by polling every 15 s, so playback starts up to 15 s after you start
+  the session. Start the session first, then the edge (or the other way round: the edge waits).
+- When the recordings end the edge exits WITHOUT reporting the cameras offline (a finished file is not a camera
+  failure; otherwise the downtime check at End session would put the never-came student in `needs_review`
+  instead of `absent`). You can press End session any time after the edge has finished.
+- The professor's end-of-class count alert (T_end − 5 min) does not fire when you end a 30-min session early;
+  that is expected.
+
 ## Optional: phone verification in the same video
 
 While the replay runs, the professor can press **Start recheck** on the live page; a real enrolled phone gets the

@@ -196,7 +196,8 @@ def main(argv: list[str] | None = None) -> int:
                       payload={"camera": name, "failures": failures}))
 
     source = args.video or env.gate_camera_source
-    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera, skip_s=args.video_offset)
+    camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera, skip_s=args.video_offset,
+                    report_end=not args.video)
     if not args.video:
         camera.start()  # recordings start in the main loop once a session is live
 
@@ -320,7 +321,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.exit_video and not (cfg.inside.enabled or exit_gate):
         log.warning("--exit-video given but config.yaml has exit and inside disabled: the recording is ignored")
     if (cfg.inside.enabled or exit_gate) and inside_source and use_inside:
-        inside_cam = Camera("inside", inside_source, on_camera, skip_s=args.exit_offset)
+        inside_cam = Camera("inside", inside_source, on_camera, skip_s=args.exit_offset,
+                            report_end=not args.exit_video)
         if not args.exit_video:
             inside_cam.start()
         if cfg.inside.enabled:  # people counting (off when the inside camera only watches the way out)

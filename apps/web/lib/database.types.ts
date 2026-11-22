@@ -1187,6 +1187,35 @@ export type Database = {
         }
         Relationships: []
       }
+      student_devices: {
+        Row: {
+          device_hash: string
+          label: string | null
+          registered_at: string
+          student_id: string
+        }
+        Insert: {
+          device_hash: string
+          label?: string | null
+          registered_at?: string
+          student_id: string
+        }
+        Update: {
+          device_hash?: string
+          label?: string | null
+          registered_at?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_devices_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       timetable_slots: {
         Row: {
           end_time: string

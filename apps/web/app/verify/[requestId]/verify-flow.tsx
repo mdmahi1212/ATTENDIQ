@@ -1,5 +1,6 @@
 "use client";
 
+import { deviceId } from "@/lib/device-id";
 import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,7 @@ export function VerifyFlow(props: {
           lng: fix?.lng ?? null,
           accuracy: fix?.accuracy ?? null,
           qr_token: qr,
+          device_id: deviceId(),
         }),
       );
       try {

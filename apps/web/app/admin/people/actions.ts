@@ -44,6 +44,17 @@ export const setActive = formAction({
   },
 });
 
+/** Rule F: forget the student's registered phone; their next self-verify registers the new one. */
+export const resetPhone = formAction({
+  roles: ["admin"],
+  schema: z.object({ id: z.guid() }),
+  revalidate: "/admin/people",
+  run: async ({ id }, { supabase }) => {
+    check(await supabase.from("student_devices").delete().eq("student_id", id));
+    return "Phone reset. The student's next self-verify registers their new phone.";
+  },
+});
+
 export const passwordLink = formAction({
   roles: ["admin"],
   schema: z.object({ email: z.email() }),

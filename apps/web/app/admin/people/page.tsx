@@ -14,7 +14,7 @@ export default async function PeoplePage() {
     lookups(),
     supabase
       .from("profiles")
-      .select("id, full_name, email, role, student_no, is_active, is_simulated, departments(name), face_profiles(status)")
+      .select("id, full_name, email, role, student_no, is_active, is_simulated, departments(name), face_profiles(status), student_devices(label)")
       .order("role")
       .order("full_name"),
   ]);
@@ -56,7 +56,10 @@ export default async function PeoplePage() {
             no: p.student_no ?? "—",
             face: p.role === "student" ? <FaceBadge status={p.face_profiles?.status ?? "pending"} /> : "—",
             status: p.is_active ? <Pill tone="green">active</Pill> : <Pill tone="red">inactive</Pill>,
-            actions: <PersonRowActions id={p.id} email={p.email} role={p.role} active={p.is_active} simulated={p.is_simulated} />,
+            actions: (
+              <PersonRowActions id={p.id} email={p.email} role={p.role} active={p.is_active} simulated={p.is_simulated}
+                phone={p.student_devices?.label ?? null} />
+            ),
           },
         }))}
       />

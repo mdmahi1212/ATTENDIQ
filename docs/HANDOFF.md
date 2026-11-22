@@ -98,3 +98,6 @@ Progress:
   if the class had any ROOM_SEEN; staff notified. Edge roomwatch.py (ROOM_SEEN 1/min/student; unknown after 5 frames
   in 10 s with best < 0.30, 1 per 2 min). Web: pills 'not seen in room', 'left, not back'; dashboard banner.
   Rolled-back SQL test: 2 events accepted, 1 alert, fahim unconfirmed, mahi clean. Edge 64, web 133.
+- 2026-11-23 rule F DONE: table student_devices (migration 20261122194154, applied; RLS own/admin read, admin delete;
+  audited). verify route needs meta.device_id (localStorage id; SHA-256 stored); first verify registers, other phone
+  -> 403 wrong_device; Admin -> People -> Reset phone. Web unit 136.

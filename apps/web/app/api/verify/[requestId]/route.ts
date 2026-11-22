@@ -6,6 +6,8 @@ import { ALL_CHALLENGES } from "@/lib/face/liveness";
 import { embedImages, FaceApiError, requireLiveness } from "@/lib/face-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decideVerification, MAX_ATTEMPTS, type VerifyReason } from "@/lib/verify/decision";
+import { checkStudentDevice } from "@/lib/verify/device";
+import { deviceLabel } from "@/lib/device-id";
 import { verifyQrToken } from "@/lib/verify/qr";
 import { loadRequestContext, policyNum, windowOpen } from "@/lib/verify/server";
 
@@ -22,6 +24,7 @@ const metaSchema = z.object({
   lng: z.number().min(-180).max(180).nullable().optional(),
   accuracy: z.number().min(0).max(100_000).nullable().optional(),
   qr_token: z.string().max(200).nullable().optional(),
+  device_id: z.guid().optional(), // rule F: this phone's id (missing = an old app version: refused below)
 });
 
 const fail = (status: number, error: string, extra: Record<string, unknown> = {}) => NextResponse.json({ ok: false, error, ...extra }, { status });
@@ -60,6 +63,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/verify/
   const meta = metaSchema.safeParse(metaJson);
   if (!meta.success || !(frame instanceof File) || frame.type !== "image/jpeg" || frame.size === 0 || frame.size > 600_000) {
     return fail(400, "Incomplete verification. Please try again.");
+  }
+
+  // Rule F: one registered phone per student (the first self-verify registers it).
+  if (!meta.data.device_id) return fail(426, "Please reload the app and try again.", { code: "update_app" });
+  const device = await checkStudentDevice(admin, user.id, meta.data.device_id, deviceLabel(request.headers.get("user-agent") ?? ""));
+  if (!device.ok) {
+    return fail(403, "This account is registered to another phone. Verify on that phone, or ask the admin to switch phones.", { code: "wrong_device" });
   }
 
   const { data: face } = await admin.from("face_profiles").select("status").eq("student_id", user.id).maybeSingle();

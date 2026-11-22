@@ -123,6 +123,8 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
    - marked at the door but **never seen in the room** → "not seen in room" (professor reviews; status kept),
    - **self-verified** on the phone but not seen in the room within 10 min → same,
    - an **unknown face sitting in the room** → the professor gets "Unknown person in the room" (no picture stored).
+   - **one phone per student**: the first "Verify now" registers that phone; another phone is refused.
+     New phone? Admin → People → **Reset phone** on that student.
 3. Real classes start by themselves from the timetable. For a live demo: **Admin → Demo → IOT401-01 →**
    5 / 10 / 15 min (short clock) or **Full class** (normal rules).
 4. To stop everything: close the four windows (broker, face-api, ingest, edge).

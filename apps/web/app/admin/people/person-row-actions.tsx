@@ -4,10 +4,12 @@ import { useState } from "react";
 import { ActionForm, RowAction, SubmitButton } from "@/components/form";
 import { ASSIGNABLE_ROLES } from "@/lib/validation";
 import type { Role } from "@/lib/roles";
-import { changeRole, passwordLink, setActive } from "./actions";
+import { changeRole, passwordLink, resetPhone, setActive } from "./actions";
 import { OneTimeLink } from "./one-time-link";
 
-export function PersonRowActions({ id, email, role, active, simulated }: { id: string; email: string | null; role: Role; active: boolean; simulated: boolean }) {
+export function PersonRowActions({ id, email, role, active, simulated, phone = null }: {
+  id: string; email: string | null; role: Role; active: boolean; simulated: boolean; phone?: string | null;
+}) {
   const [link, setLink] = useState<{ email: string; link: string } | null>(null);
   if (simulated) return <span className="text-xs text-muted-foreground">simulated</span>;
   return (
@@ -29,6 +31,15 @@ export function PersonRowActions({ id, email, role, active, simulated }: { id: s
           </>
         )}
       </ActionForm>
+      {phone && (
+        <RowAction
+          action={resetPhone}
+          fields={{ id }}
+          label={`Reset phone (${phone})`}
+          variant="outline"
+          confirm="Forget this student's registered phone? Their next self-verify registers the phone they use then."
+        />
+      )}
       <RowAction
         action={setActive}
         fields={{ id, active: String(!active) }}

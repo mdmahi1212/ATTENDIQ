@@ -50,7 +50,8 @@ class EdgeApi:
     def _call(self, method: str, path: str, **kw: Any) -> httpx.Response:
         try:
             t_send = time.time()
-            res = self._client.request(method, self._base + path, headers=self._headers, **kw)
+            headers = {**self._headers, **kw.pop("extra_headers", {})}
+            res = self._client.request(method, self._base + path, headers=headers, **kw)
             self._sample_clock(res, t_send, time.time())
         except httpx.HTTPError as e:
             raise EdgeApiError(0, str(e)) from e
@@ -77,6 +78,14 @@ class EdgeApi:
     def demo_class(self, section: str, minutes: int) -> dict[str, Any]:
         """Edge only: start a short real demo class (5 / 10 / 15 min) for a section in this device's room."""
         return self._call("POST", "/sessions/demo-class", json={"section": section, "minutes": minutes}).json()
+
+    def cameras(self) -> list[dict[str, Any]]:
+        """Edge only: camera geometry drawn on the website (Operator -> camera)."""
+        return list(self._call("GET", "/cameras").json().get("cameras", []))
+
+    def upload_snapshot(self, kind: str, jpeg: bytes) -> None:
+        """Edge only: latest picture of the door ("gate") or room ("inside") camera, to draw the geometry on."""
+        self._call("POST", f"/cameras/{kind}/snapshot", content=jpeg, extra_headers={"Content-Type": "image/jpeg"})
 
     def session_results(self, session_id: str) -> dict[str, Any]:
         return self._call("GET", f"/sessions/{session_id}/results").json()

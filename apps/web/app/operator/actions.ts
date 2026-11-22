@@ -77,9 +77,10 @@ export const saveCameraGeometry = formAction({
     }
     const parsed = cameraGeometrySchema.safeParse(json);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid geometry." };
-    const { camera_id, roi, entry_line } = parsed.data;
-    check(await supabase.from("cameras").update({ roi, entry_line }).eq("id", camera_id));
-    return "Camera geometry saved. The edge picks it up on its next config reload.";
+    const { camera_id, roi, entry_line, exit_line, door_point } = parsed.data;
+    if (exit_line && !door_point) return { ok: false, message: "Click the door side of the exit line too (Door side)." };
+    check(await supabase.from("cameras").update({ roi, entry_line, exit_line, door_point }).eq("id", camera_id));
+    return "Camera geometry saved. The edge applies it within a minute.";
   },
 });
 

@@ -74,6 +74,41 @@ def video_seconds(path: Path) -> float:
         cap.release()
 
 
+def frame_at(path: Path, seconds: float):  # noqa: ANN201 - numpy image or None
+    import cv2
+
+    cap = cv2.VideoCapture(str(path))
+    try:
+        cap.set(cv2.CAP_PROP_POS_MSEC, seconds * 1000)
+        ok, frame = cap.read()
+        return frame if ok else None
+    finally:
+        cap.release()
+
+
+def setup_cameras(pair: Pair, api, cfg, site: str) -> int:  # noqa: ANN001
+    """Sends one picture from each recording to the website, then opens the camera pages to draw on."""
+    from edge.camera import rotate_frame
+
+    for kind, path, rot in (("gate", pair.door, cfg.gate.rotate), ("inside", pair.room, cfg.inside.rotate)):
+        secs = video_seconds(path)
+        frame = frame_at(path, min(60.0, secs / 3))  # a moment when people are in view
+        if frame is None:
+            return fail(f"Could not read a picture from {path.name}.")
+        import cv2
+
+        frame = rotate_frame(frame, rot)
+        h, w = frame.shape[:2]
+        if w > 1280:
+            frame = cv2.resize(frame, (1280, int(h * 1280 / w)))
+        api.upload_snapshot(kind, cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes())
+        print(f"  picture from {path.name} sent ({'door' if kind == 'gate' else 'room'} camera)")
+    print("\nNow on the website: Operator -> Devices -> edge-B204 -> the room camera: draw the seat area, the exit line"
+          "\nand click the door side, then Save. Then double-click START-DEMO.bat.")
+    webbrowser.open(f"{site}/operator")
+    return 0
+
+
 def port_open(port: int, host: str = "127.0.0.1") -> bool:
     with socket.socket() as s:
         s.settimeout(0.5)
@@ -120,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--folder", default=str(VIDEOS), help="folder with the recordings (default demo\\videos)")
     ap.add_argument("--no-face-api", action="store_true", help="do not start the face API")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
+    ap.add_argument("--setup", action="store_true", help="only send a picture from each video to draw the geometry on")
     a = ap.parse_args(argv)
 
     pairs = find_pairs(Path(a.folder))
@@ -129,6 +165,13 @@ def main(argv: list[str] | None = None) -> int:
     if not (EDGE_DIR / ".env").exists():
         return fail(f"{EDGE_DIR / '.env'} is missing (device key + website address). See apps\\edge\\.env.example.")
     pair = choose(pairs)
+    if a.setup:
+        from attendiq_common.api import EdgeApi
+        from edge.config import Env, load_yaml
+
+        env = Env()  # type: ignore[call-arg]
+        return setup_cameras(pair, EdgeApi(env.api_base_url, env.edge_device_key), load_yaml(env.edge_config_path),
+                             env.api_base_url.rstrip("/"))
     secs = video_seconds(pair.door)
     minutes = class_minutes(secs)
 

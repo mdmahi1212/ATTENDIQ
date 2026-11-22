@@ -144,6 +144,8 @@ export const cameraGeometrySchema = z.object({
   camera_id: id,
   roi: z.array(normPoint).min(3).max(50).nullable(),
   entry_line: z.array(normPoint).length(2).nullable(),
+  exit_line: z.array(normPoint).length(2).nullable().default(null),
+  door_point: normPoint.nullable().default(null),
 });
 
 /** One row of the people CSV import (header: email,full_name,role,student_no). */

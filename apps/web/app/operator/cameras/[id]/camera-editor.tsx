@@ -9,7 +9,7 @@ import { normalise, type Pt } from "@/lib/camera-geometry";
 import { createClient } from "@/lib/supabase/client";
 import { saveCameraGeometry, setSnapshotPath } from "../../actions";
 
-type Mode = "roi" | "line";
+type Mode = "roi" | "line" | "exit" | "door";
 
 export function CameraEditor({
   cameraId,
@@ -17,25 +17,35 @@ export function CameraEditor({
   snapshotUrl,
   initialRoi,
   initialLine,
+  initialExit,
+  initialDoor,
+  snapshotAt,
 }: {
   cameraId: string;
   kind: "gate" | "inside";
   snapshotUrl: string | null;
   initialRoi: Pt[];
   initialLine: Pt[];
+  initialExit: Pt[];
+  initialDoor: Pt | null;
+  snapshotAt: string | null;
 }) {
   const router = useRouter();
   const box = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>("roi");
   const [roi, setRoi] = useState<Pt[]>(initialRoi);
   const [line, setLine] = useState<Pt[]>(initialLine);
+  const [exit, setExit] = useState<Pt[]>(initialExit);
+  const [door, setDoor] = useState<Pt | null>(initialDoor);
   const [pending, start] = useTransition();
 
   function onClick(e: React.MouseEvent<HTMLDivElement>) {
     const r = box.current!.getBoundingClientRect();
     const p = normalise(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
     if (mode === "roi") setRoi((prev) => [...prev, p]);
-    else setLine((prev) => (prev.length >= 2 ? [p] : [...prev, p]));
+    else if (mode === "line") setLine((prev) => (prev.length >= 2 ? [p] : [...prev, p]));
+    else if (mode === "exit") setExit((prev) => (prev.length >= 2 ? [p] : [...prev, p]));
+    else setDoor(p);
   }
 
   async function upload(file: File | undefined) {
@@ -56,7 +66,13 @@ export function CameraEditor({
     const fd = new FormData();
     fd.set(
       "payload",
-      JSON.stringify({ camera_id: cameraId, roi: roi.length >= 3 ? roi : null, entry_line: line.length === 2 ? line : null }),
+      JSON.stringify({
+        camera_id: cameraId,
+        roi: roi.length >= 3 ? roi : null,
+        entry_line: line.length === 2 ? line : null,
+        exit_line: exit.length === 2 ? exit : null,
+        door_point: exit.length === 2 ? door : null,
+      }),
     );
     start(async () => {
       const res = await saveCameraGeometry(initialActionState, fd);
@@ -90,24 +106,45 @@ export function CameraEditor({
           {line.map(([x, y], i) => (
             <circle key={`l${i}`} cx={x * 100} cy={y * 100} r={1} fill="#dc2626" />
           ))}
+          {exit.length === 2 && <polyline points={pts(exit)} stroke="#f59e0b" strokeWidth={0.9} fill="none" strokeDasharray="2 1" />}
+          {exit.map(([x, y], i) => (
+            <circle key={`e${i}`} cx={x * 100} cy={y * 100} r={1} fill="#f59e0b" />
+          ))}
+          {door && <circle cx={door[0] * 100} cy={door[1] * 100} r={1.6} fill="#16a34a" stroke="#fff" strokeWidth={0.4} />}
         </svg>
       </div>
       <div className="space-y-4 text-sm">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant={mode === "roi" ? "default" : "outline"} onClick={() => setMode("roi")}>
-            Draw ROI ({roi.length})
+            {kind === "inside" ? "Seat area" : "Doorway area"} ({roi.length})
           </Button>
           {kind === "gate" && (
             <Button type="button" variant={mode === "line" ? "default" : "outline"} onClick={() => setMode("line")}>
               Entry line ({line.length}/2)
             </Button>
           )}
+          {kind === "inside" && (
+            <>
+              <Button type="button" variant={mode === "exit" ? "default" : "outline"} onClick={() => setMode("exit")}>
+                Exit line ({exit.length}/2)
+              </Button>
+              <Button type="button" variant={mode === "door" ? "default" : "outline"} onClick={() => setMode("door")}>
+                Door side {door ? "✓" : ""}
+              </Button>
+            </>
+          )}
         </div>
+        <p className="text-xs text-muted-foreground">
+          {mode === "roi" && (kind === "inside" ? "Click around the seats: only people whose feet are inside are counted." : "Click around the doorway.")}
+          {mode === "line" && "Click two points: the line people cross when they walk in."}
+          {mode === "exit" && "Click two points: a line between the seats and the door. Crossing it toward the door = left."}
+          {mode === "door" && "Click once on the door side of the exit line."}
+        </p>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => (mode === "roi" ? setRoi((r) => r.slice(0, -1)) : setLine((l) => l.slice(0, -1)))}>
+          <Button type="button" size="sm" variant="outline" onClick={() => (mode === "roi" ? setRoi((r) => r.slice(0, -1)) : mode === "line" ? setLine((l) => l.slice(0, -1)) : mode === "exit" ? setExit((l) => l.slice(0, -1)) : setDoor(null))}>
             Undo
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => (mode === "roi" ? setRoi([]) : setLine([]))}>
+          <Button type="button" size="sm" variant="outline" onClick={() => (mode === "roi" ? setRoi([]) : mode === "line" ? setLine([]) : mode === "exit" ? setExit([]) : setDoor(null))}>
             Clear
           </Button>
           <Button type="button" size="sm" onClick={save} disabled={pending}>
@@ -117,7 +154,10 @@ export function CameraEditor({
         <label className="grid gap-1">
           <span className="font-medium">Snapshot</span>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => upload(e.target.files?.[0])} />
-          <span className="text-xs text-muted-foreground">Private bucket; the edge will upload these automatically in Phase 5.</span>
+          <span className="text-xs text-muted-foreground">
+            {snapshotAt ? `From the camera at ${new Date(snapshotAt).toLocaleTimeString()} (the edge sends a new one every 2 min while running). ` : "The edge uploads one by itself while it runs. "}
+            Private; operators only. Refresh the page for the newest.
+          </span>
         </label>
       </div>
     </div>

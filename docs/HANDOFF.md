@@ -74,3 +74,14 @@ Progress:
   OUT -> absent if not back), accepted risk of swapped tracks; (2) door camera tracks bodies too: DoorBodyWatcher ->
   GATE_ENTRY_UNKNOWN {via body, face not seen} + LED red when a body >=1 s never shows a face. One shared YOLO model
   (lock) for door + room. Edge 52 tests; restarted OK. NOT verified with real people.
+- 2026-11-23 NEXT BUILD (user approved, one by one, commit each, push only on "push"):
+  upgrades #2 draw exit line + seat area on website (camera snapshot, saved in DB, edge fetches) -> #1 BoT-SORT ReID
+  body tracking -> #3 door anti-spoof (liveness.onnx on door faces) -> rules E (door-marked student must be seen by the
+  room camera, else 'unconfirmed' for professor review) + B (self-verify counts only if room camera sees that face
+  within 10 min, else 'unconfirmed') -> C (unknown face sitting in room = professor-only live alert, never stored) ->
+  F (one registered phone per student; change needs admin) -> #4 room map + time in class from body tracks ->
+  #5 AI class summary (Claude API) for professor. NOT chosen: A (min time %), G (pattern warnings), H (appeal limit).
+- 2026-11-23 #2 DONE (local commit): cameras.exit_line/door_point/snapshot_at (migration 20261122190157, applied);
+  edge GET /api/edge/v1/cameras + POST /cameras/{gate|inside}/snapshot; edge/geometry_sync.py applies website geometry
+  every 60 s, SnapshotSender every 120 s; editor modes Seat area / Exit line / Door side; demo\SETUP-CAMERAS.bat.
+  Tested against local dev: snapshot upload, draw + save in editor, edge plan() -> out_side 1. Test geometry cleared.

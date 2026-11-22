@@ -135,6 +135,21 @@ def main(argv: list[str] | None = None) -> int:
         body_exit = BodyExitTracker(cfg.exit.line_a, cfg.exit.line_b, cfg.exit.out_side, gallery, gate.memory,
                                     exit_gate.cfg.thresholds,
                                     lambda sid, payload: _eg.report_out(sid, payload, t=time.monotonic()))
+    from edge.geometry_sync import SnapshotSender
+    from edge.geometry_sync import apply as apply_geometry
+    from edge.geometry_sync import plan as plan_geometry
+
+    snaps = SnapshotSender(api.upload_snapshot)  # pictures for drawing the geometry on the website
+
+    def sync_geometry() -> None:
+        try:
+            done = apply_geometry(plan_geometry(api.cameras()), cfg, gate, exit_gate, body_exit)
+        except EdgeApiError as e:
+            log.warning("camera geometry not loaded: %s", e)
+            return
+        if done:
+            log.info("camera geometry from the website applied: %s", ", ".join(done))
+
     session_lock = threading.Lock()
 
     def set_session(session_id: str | None, reason: str) -> None:
@@ -276,6 +291,8 @@ def main(argv: list[str] | None = None) -> int:
                 session_seen = gate.session_id
                 counter.reset()
             _, frame, _ = cam.latest()
+            if frame is not None and snaps.due("inside"):
+                snaps.offer("inside", rotate_frame(frame, cfg.inside.rotate))
             if frame is not None and gate.session_id is not None:
                 frame = rotate_frame(frame, cfg.inside.rotate)
                 boxes = person_boxes(frame)
@@ -331,8 +348,12 @@ def main(argv: list[str] | None = None) -> int:
     # ------------------------------------------------------------ heartbeat + session poll
     def background() -> None:
         next_hb, next_poll, next_gallery = 0.0, 0.0, time.monotonic() + cfg.gallery_refresh_seconds
+        next_geom = 0.0
         while not stop.is_set():
             now = time.monotonic()
+            if now >= next_geom:
+                next_geom = now + 60
+                sync_geometry()
             if now >= next_poll:
                 # demo: poll fast until the class is live, so the recordings start within ~2 s of the start
                 next_poll = now + (2 if args.demo and gate.session_id is None else cfg.control_poll_seconds)
@@ -396,6 +417,8 @@ def main(argv: list[str] | None = None) -> int:
                 time.sleep(2)  # let the last decisions publish
                 break
             seq, frame, _ = camera.latest()
+            if frame is not None and snaps.due("gate"):
+                snaps.offer("gate", rotate_frame(frame, rotation))
             if frame is None or seq == last_seq or gate.session_id is None:
                 time.sleep(0.01)
                 continue

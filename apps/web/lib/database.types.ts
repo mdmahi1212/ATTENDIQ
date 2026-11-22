@@ -244,28 +244,37 @@ export type Database = {
       cameras: {
         Row: {
           device_id: string
+          door_point: Json | null
           entry_line: Json | null
+          exit_line: Json | null
           id: string
           kind: string
           roi: Json | null
+          snapshot_at: string | null
           snapshot_path: string | null
           stream_url: string | null
         }
         Insert: {
           device_id: string
+          door_point?: Json | null
           entry_line?: Json | null
+          exit_line?: Json | null
           id?: string
           kind: string
           roi?: Json | null
+          snapshot_at?: string | null
           snapshot_path?: string | null
           stream_url?: string | null
         }
         Update: {
           device_id?: string
+          door_point?: Json | null
           entry_line?: Json | null
+          exit_line?: Json | null
           id?: string
           kind?: string
           roi?: Json | null
+          snapshot_at?: string | null
           snapshot_path?: string | null
           stream_url?: string | null
         }

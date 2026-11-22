@@ -9,7 +9,7 @@ export default async function CameraPage({ params }: PageProps<"/operator/camera
   const supabase = await createClient();
   const { data: cam } = await supabase
     .from("cameras")
-    .select("id, kind, stream_url, roi, entry_line, snapshot_path, edge_devices(name, rooms(code))")
+    .select("id, kind, stream_url, roi, entry_line, exit_line, door_point, snapshot_path, snapshot_at, edge_devices(name, rooms(code))")
     .eq("id", id)
     .maybeSingle();
   if (!cam) notFound();
@@ -23,7 +23,7 @@ export default async function CameraPage({ params }: PageProps<"/operator/camera
         description={
           cam.kind === "gate"
             ? "Draw the doorway region and the entry line. Crossing the line toward the room = IN."
-            : "Draw the seat area. People whose feet are outside it are not counted (door, podium, windows)."
+            : "Draw the seat area (only people whose feet are inside are counted), the exit line between the seats and the door, and click the door side. The edge applies it within a minute."
         }
       />
       <CameraEditor
@@ -32,6 +32,9 @@ export default async function CameraPage({ params }: PageProps<"/operator/camera
         snapshotUrl={signed}
         initialRoi={parsePoints(cam.roi)}
         initialLine={parsePoints(cam.entry_line)}
+        initialExit={parsePoints(cam.exit_line)}
+        initialDoor={parsePoints(cam.door_point ? [cam.door_point] : null)[0] ?? null}
+        snapshotAt={cam.snapshot_at}
       />
     </>
   );

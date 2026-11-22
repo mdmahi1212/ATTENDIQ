@@ -67,8 +67,11 @@ In the presentation press **5 min** instead of 10 min. Person 4 must finish "Ver
 ### After filming
 1. Copy both videos into the project's **`demo\videos`** folder and name them **`door.mp4`** (phone 1) and
    **`room.mp4`** (phone 2). The 5-minute pair: **`door5.mp4`** + **`room5.mp4`**.
-2. Tell Claude "videos ready". Claude checks one frame of each and sets the rotation and the exit line
-   (`apps\edge\config.demo.yaml`). Do not start the demo before this.
+2. Double-click **`demo\SETUP-CAMERAS.bat`**. It sends one picture from each video to the website and opens it.
+3. Website: **Operator → Devices → edge-B204 → room camera ("inside")**:
+   **Seat area** (click around the seats) → **Exit line** (2 clicks between the seats and the door) →
+   **Door side** (1 click on the door side) → **Save geometry**. The edge uses it from then on (no files to edit).
+   Rotation of the videos: Claude checks it ("videos ready").
 
 ---
 
@@ -105,6 +108,8 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
 1. Phone 1: **IP Webcam** → Start server. iPhone: **IP Camera Lite** → server on, main camera. Same Wi-Fi as the laptop.
 2. Double-click **`START-CLASS.bat`** (project folder). By itself it:
    - checks both phone cameras (says which one is not reachable),
+   - sends a picture from each camera to the website every 2 min (Operator → Devices → camera: draw the seat area,
+     exit line and door side there; the edge applies it within a minute),
    - opens a window each for the broker, the face API, ingest and the edge (face + person models on the GPU),
    - opens the live camera view (http://127.0.0.1:8090) and the website. The live view also shows the
      **ESP32 door LED** on screen (we have no board): green = recognised, red = unknown face, amber = someone left.

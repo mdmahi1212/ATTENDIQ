@@ -164,3 +164,8 @@ Progress:
   (present Tanim, Fahad, Jjjj, Sourav; absent Nahid, jidan, Mahi, fahim). SQL test G added (8 checks pass, rolled
   back). Still open: body->name voting swaps neighbours (Nahid/Fahad) in the demo video; room count undercounts (max 4
   of 6). The final check during demo must run BEFORE the videos end (held last frame = no new faces).
+- 2026-11-24 DOOR CUTOFF (user decision): door recognition marks attendance only until policy door_marks_until_min
+  (default 15; demos = late_until_min). Migration 20261123164034 (applied; patches apply_edge_events in place, adds
+  the key to settings.policy): later door sightings are stored and still give reentry / return-after-OUT, but do not
+  mark unmarked students (room camera / phone do). Web: policySchema key (default 15), settings form field, demo table
+  row. SQL test H (6 checks pass, rolled back); web 155 unit tests, lint, typecheck OK.

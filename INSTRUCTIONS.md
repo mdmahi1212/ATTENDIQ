@@ -100,6 +100,10 @@ In the presentation press **5 min** instead of 10 min. Person 4 must finish "Ver
 | 3 | absent (left and did not come back) |
 | everyone else enrolled | absent |
 
+The door camera marks attendance only in the first 15 minutes (Admin → Settings → "Door camera marks attendance
+until"; demos use the "Late until" minute). Later arrivals are marked by the room camera or their phone; the door
+still tracks exits and returns.
+
 Someone who leaves without the door camera naming them is still marked absent at the end when the room camera
 stopped seeing them and the room count is short (the professor is told and can change it).
 

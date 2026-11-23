@@ -102,6 +102,9 @@ export const policySchema = z
   .object({
     present_until_min: z.number().int().min(0).max(60),
     late_until_min: z.number().int().min(1).max(120),
+    // The door camera marks attendance only until this many minutes after the start; later it still tracks exits,
+    // re-entries and unknown faces, and late students are marked by the room camera or their phone (user 2026-11-24).
+    door_marks_until_min: z.number().int().min(1).max(240).default(15),
     first_mismatch_check_min: z.number().int().min(1).max(60),
     mismatch_interval_min: z.number().int().min(1).max(30),
     verify_window_min: z.number().int().min(1).max(30),

@@ -112,6 +112,7 @@ export default async function DemoPage() {
                     [
                       ["Present until", (m: number) => demoPolicy(m).present_until_min, "10"],
                       ["Late until", (m: number) => demoPolicy(m).late_until_min, "30"],
+                      ["Door marks until", (m: number) => demoPolicy(m).door_marks_until_min, "15"],
                       ["Count check every", (m: number) => demoPolicy(m).mismatch_interval_min, "5"],
                       ["Professor alert at", (m: number) => m - demoPolicy(m).recheck_before_end_min, "end − 5"],
                     ] as const

@@ -13,6 +13,7 @@ const GROUPS: { title: string; fields: { key: NumKey; label: string; step?: stri
     fields: [
       { key: "present_until_min", label: "Present until" },
       { key: "late_until_min", label: "Late until (then very late = absent)" },
+      { key: "door_marks_until_min", label: "Door camera marks attendance until" },
       { key: "lock_after_hours", label: "Lock session after (hours)" },
       { key: "appeal_days", label: "Appeal window (days)" },
       { key: "late_weight", label: "Late counts as (0–1 of present)", step: "0.05" },

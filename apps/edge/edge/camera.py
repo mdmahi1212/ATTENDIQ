@@ -53,9 +53,10 @@ class Backoff:
 class Camera:
     def __init__(self, name: str, source: str, on_status: Callable[[str, bool, int], None] | None = None,
                  opener: Callable[[str], Capture] = open_capture, loop_file: bool = False,
-                 sleep: Callable[[float], None] = time.sleep, hold_last: bool = False) -> None:
+                 sleep: Callable[[float], None] = time.sleep, hold_last: bool = False,
+                 clock: Callable[[], float] = time.monotonic) -> None:
         self.name, self.source = name, source
-        self._open, self._on_status, self._sleep = opener, on_status, sleep
+        self._open, self._on_status, self._sleep, self._clock = opener, on_status, sleep, clock
         self._loop_file = loop_file
         # Recorded demo: at the end of a file keep showing the last frame and stay "online", so a finished
         # recording is not reported as camera downtime while the class is still running.
@@ -128,9 +129,18 @@ class Camera:
             fps_src = cap.get(5) if file_mode else 0  # CAP_PROP_FPS
             frame_dt = 1.0 / fps_src if fps_src and fps_src > 0 else 0.0
             n, t_fps = 0, time.monotonic()
+            t_start, pos = self._clock(), 0  # files: frame `pos` is due at t_start + pos * frame_dt (wall clock)
             while not self._stop.is_set() and not self._reopen.is_set():
-                t_read = time.monotonic()
+                if frame_dt:
+                    # Recorded video follows the clock like a live camera: when reading fell behind (busy CPU / GIL),
+                    # skip frames instead of drifting (a minute behind after 5 min of 59 fps video, seen in a demo).
+                    due = int((self._clock() - t_start) / frame_dt)
+                    skipped = 0
+                    while pos < due and skipped < 120 and cap.grab():
+                        pos += 1
+                        skipped += 1
                 ok, frame = cap.read()
+                pos += 1
                 if not ok or frame is None:
                     break
                 with self._lock:
@@ -139,8 +149,8 @@ class Camera:
                 n += 1
                 if time.monotonic() - t_fps >= 2:
                     self.fps, n, t_fps = n / (time.monotonic() - t_fps), 0, time.monotonic()
-                if frame_dt:  # play files at real-time speed
-                    self._sleep(max(0.0, frame_dt - (time.monotonic() - t_read)))
+                if frame_dt:  # wait until the next frame is due (real-time speed)
+                    self._sleep(max(0.0, t_start + pos * frame_dt - self._clock()))
             cap.release()
             if self._reopen.is_set():  # new address: open it right away
                 backoff.reset()

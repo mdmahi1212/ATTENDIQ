@@ -135,3 +135,9 @@ Progress:
   show a usable face ~2 s (70->200 px, checked frame by frame) -> tracks fragmented, only 2 of ~9 decided.
   Fix: exit.max_fps 2 (room face looks/s), gate.process_every_nth 1 (config.py default + config.yaml/example).
   GPU benchmark: door face 35 ms, room tiled 133 ms, yolo 25 ms -> door ~20 fps. NOT yet re-run with the videos.
+- 2026-11-24 DEMO RE-RUN (session 28283085): door recognised 3 (Tanim 0:13, jidan 0:29, Jjjj 0:43; ~9 fps vs ~4).
+  OUT: Fahad 2:04 -> absent left_no_return (correct), jidan 4:30 -> back at the door -> present (door video shows a
+  person returning at 5:00), Jjjj 0:50 (wrong, corrected by later sighting -> present). Result: present Tanim, jidan,
+  Jjjj, Sourav, Nahid; absent Fahad (left), Mahi, fahim (not in videos).
+  New bug found + fixed: recorded video played slow under load (door event at class 6:11 = video 5:00, ~1 min lag);
+  Camera now follows the wall clock and skips frames when behind (test added; edge 80). Not re-run after this fix.

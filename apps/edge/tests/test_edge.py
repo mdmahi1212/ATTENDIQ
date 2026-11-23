@@ -409,3 +409,46 @@ def test_a_real_face_passes_and_its_live_score_is_logged() -> None:
     _stand(pipe, live=0.95)
     rec = [e for e in events if e.event_type.value == "GATE_ENTRY_RECOGNISED"]
     assert len(rec) == 1 and rec[0].payload["live_score"] == 0.95 and fb[-1] == "ok"
+
+
+def test_recorded_video_keeps_real_time_by_skipping_frames_when_reading_is_slow(tmp_path: Path) -> None:
+    video = tmp_path / "door.mp4"
+    video.write_bytes(b"")
+    now = [0.0]
+    reads: list[int] = []
+
+    class SlowCap:  # 10 fps, 100 frames (10 s); every read takes 0.5 s, so we fall 4 frames behind each time
+        def __init__(self) -> None:
+            self.pos = 0
+
+        def isOpened(self) -> bool:  # noqa: N802
+            return True
+
+        def grab(self) -> bool:
+            if self.pos >= 100:
+                return False
+            self.pos += 1
+            return True
+
+        def read(self):  # noqa: ANN201
+            if self.pos >= 100:
+                return False, None
+            reads.append(self.pos)
+            self.pos += 1
+            now[0] += 0.5
+            return True, np.zeros((4, 4, 3), np.uint8)
+
+        def release(self) -> None:
+            pass
+
+        def get(self, prop: int) -> float:
+            return 10.0 if prop == 5 else 0.0
+
+    cam = Camera("gate", str(video), opener=lambda _s: SlowCap(), sleep=lambda s: now.__setitem__(0, now[0] + s),
+                 clock=lambda: now[0], hold_last=True)
+    cam.start()
+    assert cam._thread is not None
+    cam._thread.join(2)
+    assert cam.ended
+    assert len(reads) <= 22  # ~every 5th frame shown: the 10 s video took ~10 s, not 50 s
+    assert now[0] <= 11.5

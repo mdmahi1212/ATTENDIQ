@@ -65,12 +65,14 @@ class BodyExitTracker:
         self.vanished: list[tuple[str, float]] = []  # (student, time) named bodies lost near the door
         self.edge_mode = False  # set when the exit line lies on a picture border (door outside the picture)
         self._lock = threading.Lock()  # faces() runs in the exit loop, update() in the body loop
+        self._used: set[int] = set()  # face sightings that already voted for a body
 
     def reset(self) -> None:
         with self._lock:
             self._reset()
 
     def _reset(self) -> None:
+        self._used.clear()
         self.tracker.clear()
         self._who.clear()
         self._faces.clear()
@@ -109,6 +111,7 @@ class BodyExitTracker:
             touched, ended = self.tracker.update([(b, 0.0, None) for b in bodies], t)
         a = (self.line_a[0] * w, self.line_a[1] * h)
         b = (self.line_b[0] * w, self.line_b[1] * h)
+        self._vote(touched, t)
         for tr in ended:
             who = self._who.pop(tr.track_id, None)
             sid = self._identity(who)
@@ -143,12 +146,6 @@ class BodyExitTracker:
             who = self._who.setdefault(tr.track_id, _Who())
             if who.start is None:
                 who.start = tr.history[-1] if tr.history else None
-            x1, y1, x2, y2 = tr.box
-            upper = y1 + (y2 - y1) * 0.5  # faces sit in the upper half of a body box
-            for (fx, fy), sid, ft, seq in self._faces:
-                if seq not in who.counted and t - ft <= FACE_FRESH_S and x1 <= fx <= x2 and y1 <= fy <= upper:
-                    who.counted.add(seq)  # one vote per face sighting, however many body frames follow
-                    who.votes[sid] += 1
             if who.reported:
                 continue
             # the room is on the side opposite the door: in_side = -out_side, so "out" = toward the door
@@ -157,6 +154,29 @@ class BodyExitTracker:
                 out.append((tr.track_id, who))
         return out
 
+    def _vote(self, touched: Sequence[object], t: float) -> None:
+        """Each face sighting votes for ONE body: the one whose head area it sits in best. With people seated close
+        together the body boxes overlap; letting a face vote for every box it falls in named the wrong person
+        (seen in a demo: a student who stayed was reported as the one who left)."""
+        for (fx, fy), sid, ft, seq in self._faces:
+            if seq in self._used or t - ft > FACE_FRESH_S:
+                continue
+            best, best_cost = None, 9.0
+            for tr in touched:
+                x1, y1, x2, y2 = tr.box  # type: ignore[attr-defined]
+                bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
+                if not (x1 <= fx <= x2 and y1 - 0.1 * bh <= fy <= y1 + 0.45 * bh):
+                    continue  # a head sits in the top part of its own body box
+                cost = abs(fx - (x1 + x2) / 2) / bw + abs(fy - (y1 + 0.15 * bh)) / bh
+                if cost < best_cost:
+                    best, best_cost = tr, cost
+            if best is not None:
+                self._used.add(seq)
+                self._who.setdefault(best.track_id, _Who()).votes[sid] += 1  # type: ignore[attr-defined]
+        if len(self._used) > 5000:  # forget old sightings
+            fresh = {f[3] for f in self._faces}
+            self._used &= fresh
+
     def identity(self, track_id: int) -> str | None:
         return self._identity(self._who.get(track_id))
 
@@ -164,8 +184,11 @@ class BodyExitTracker:
     def _identity(who: _Who | None) -> str | None:
         if not who or not who.votes:
             return None
-        sid, n = who.votes.most_common(1)[0]
-        return sid if n >= MIN_VOTES else None
+        top = who.votes.most_common(2)
+        sid, n = top[0]
+        runner_up = top[1][1] if len(top) > 1 else 0
+        # a name sticks only when it clearly wins (two people's faces in one body box = not sure = no name)
+        return sid if n >= MIN_VOTES and n >= 2 * runner_up else None
 
     def _on_out(self, track_id: int, who: _Who) -> None:
         sid = self._identity(who)

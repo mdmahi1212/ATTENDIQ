@@ -141,3 +141,10 @@ Progress:
   Jjjj, Sourav, Nahid; absent Fahad (left), Mahi, fahim (not in videos).
   New bug found + fixed: recorded video played slow under load (door event at class 6:11 = video 5:00, ~1 min lag);
   Camera now follows the wall clock and skips frames when behind (test added; edge 80). Not re-run after this fix.
+- 2026-11-24 USER TRUTH for the demo videos: present all class Fahad, Sourav; Tanim + Refat(Jjjj) left and came back;
+  Nahid came and left (never back); jidan left, showed his face at the door again but did not come in; Mahi/fahim not
+  there. System had: Fahad absent (wrong: the 1:52 leaver was Nahid, named Fahad by overlapping body boxes), Nahid
+  present (wrong), jidan present (wrong: door sighting after OUT counted as return).
+  Fixes: bodyexit._vote (each face votes for ONE body, head area; name needs >= 2x runner-up), migration
+  20261123160306 (applied): after an OUT, return needs ROOM_SEEN / phone verify / staff, door alone only if no room
+  camera that class (rolled-back test: jidan absent, Tanim present). Edge 82 tests. NOT re-run with the videos yet.

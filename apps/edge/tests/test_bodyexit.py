@@ -261,3 +261,28 @@ def test_edge_mode_someone_arriving_through_the_bottom_is_not_leaving() -> None:
     for k in range(8):
         tr.update([], W, H, 4.0 + k * 0.2, ids=[])
     assert reports == []  # never settled in the room: not a "left the class"
+
+
+def test_neighbours_face_does_not_name_the_wrong_body() -> None:
+    # Two students seated close: body boxes overlap. A's head is over body 1, B's over body 2; B's face also falls
+    # inside body 1's (wide) box. B must not name body 1.
+    g = Gallery()
+    g.load(GALLERY)
+    tr = BodyExitTracker((0.3, 0.0), (0.3, 1.0), 1, g, SessionMemory(), Thresholds(), lambda s, p: None)
+    b1, b2 = (200, 100, 360, 400), (300, 110, 420, 400)  # overlap 300-360
+    for k in range(6):
+        t = k * 0.2
+        tr.faces([FaceDet((255, 110, 295, 150), 0.9, near(A, 0.8, 90 + k)),  # A: over the middle of body 1
+                  FaceDet((340, 120, 380, 160), 0.9, near(B, 0.8, 100 + k))], t)  # B: over body 2 (and inside body 1)
+        tr.update([b1, b2], W, H, t, ids=[1, 2])
+    assert tr.identity(1) == "stu-a" and tr.identity(2) == "stu-b"
+
+
+def test_a_body_with_two_names_close_together_gets_no_name() -> None:
+    from edge.bodyexit import _Who
+
+    who = _Who()
+    who.votes.update({"stu-a": 3, "stu-b": 2})
+    assert BodyExitTracker._identity(who) is None  # not sure -> nobody is blamed
+    who.votes.update({"stu-a": 3})
+    assert BodyExitTracker._identity(who) == "stu-a"  # 6 vs 2: clear

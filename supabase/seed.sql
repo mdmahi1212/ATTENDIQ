@@ -121,9 +121,10 @@ insert into public.edge_devices (id, room_id, name, kind) values
   ('e0000000-0000-4000-8000-000000000003', '40000000-0000-4000-8000-000000000001', 'simulator-B204', 'simulator')
 on conflict do nothing;
 
+-- stream_url null = automatic: the edge finds the phone cameras on its Wi-Fi (or pick one on Operator -> camera).
 insert into public.cameras (device_id, kind, stream_url) values
-  ('e0000000-0000-4000-8000-000000000001', 'gate',   'http://<phone-1-ip>:8080/video'),
-  ('e0000000-0000-4000-8000-000000000001', 'inside', '0')
+  ('e0000000-0000-4000-8000-000000000001', 'gate',   null),
+  ('e0000000-0000-4000-8000-000000000001', 'inside', null)
 on conflict do nothing;
 
 -- ---------------------------------------------------------------- the 3 real students

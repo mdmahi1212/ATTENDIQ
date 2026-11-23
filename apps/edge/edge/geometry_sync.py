@@ -4,6 +4,7 @@ back so the geometry can be drawn on a current picture. Points are normalised (0
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -39,7 +40,7 @@ def stream_choices(cameras: list[dict[str, Any]]) -> dict[str, str]:
     out: dict[str, str] = {}
     for c in cameras:
         url = str(c.get("stream_url") or "").strip()
-        if c.get("kind") in ("gate", "inside") and url.startswith(("http://", "https://", "rtsp://")):
+        if c.get("kind") in ("gate", "inside") and re.fullmatch(r"(https?|rtsp)://[A-Za-z0-9.\-]+(:\d+)?(/\S*)?", url):
             out[str(c["kind"])] = url
     return out
 

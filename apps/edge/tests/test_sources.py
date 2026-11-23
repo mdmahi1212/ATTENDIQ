@@ -26,3 +26,12 @@ def test_find_cameras_keeps_only_real_streams_sorted_by_address() -> None:
     found = find_cameras(net, skip=["192.168.5.1"], opener=lambda h, p: (h, p) in open_ports,
                          prober=lambda h, p: streams.get((h, p)))  # .3:8080 is open but is not a camera
     assert found == ["http://192.168.5.2:8081/video", "http://192.168.5.6:8080/video"]
+
+
+def test_placeholder_addresses_from_the_website_are_ignored() -> None:
+    from edge.geometry_sync import stream_choices
+
+    rows = [{"kind": "gate", "stream_url": "http://<phone-1-ip>:8080/video"}, {"kind": "inside", "stream_url": "0"},
+            {"kind": "gate", "stream_url": None}]
+    assert stream_choices(rows) == {}
+    assert stream_choices([{"kind": "inside", "stream_url": "http://10.0.0.7:8081/video"}]) == {"inside": "http://10.0.0.7:8081/video"}

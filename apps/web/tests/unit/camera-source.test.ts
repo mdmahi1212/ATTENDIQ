@@ -8,6 +8,7 @@ describe("camera address", () => {
     expect(streamUrlSchema.safeParse("").success).toBe(true);
     expect(streamUrlSchema.safeParse("javascript:alert(1)").success).toBe(false);
     expect(streamUrlSchema.safeParse("http://a b/video").success).toBe(false);
+    expect(streamUrlSchema.safeParse("http://<phone-1-ip>:8080/video").success).toBe(false); // placeholder
   });
 
   it("reads what the edge reported, ignoring junk", () => {

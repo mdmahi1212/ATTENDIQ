@@ -5,7 +5,7 @@ export const streamUrlSchema = z
   .string()
   .trim()
   .max(300)
-  .refine((v) => v === "" || /^(https?|rtsp):\/\/[^\s/]+(:\d+)?(\/\S*)?$/i.test(v), "Use an address like http://phone-address:8080/video");
+  .refine((v) => v === "" || /^(https?|rtsp):\/\/[a-z0-9.-]+(:\d+)?(\/\S*)?$/i.test(v), "Use an address like http://phone-address:8080/video");
 
 /** What the edge reported in its heartbeat: cameras found on the Wi-Fi and the address each camera uses now. */
 export function edgeCameraStatus(status: unknown): { found: string[]; sources: Record<string, string>; online: Record<string, boolean | null> } {

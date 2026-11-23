@@ -1,5 +1,6 @@
 "use server";
 
+import { streamUrlSchema } from "@/lib/camera-source";
 import { z } from "zod";
 import { check, formAction } from "@/lib/admin-action";
 import { generateDeviceKey } from "@/lib/device-key";
@@ -81,6 +82,17 @@ export const saveCameraGeometry = formAction({
     if (exit_line && !door_point) return { ok: false, message: "Click the door side of the exit line too (Door side)." };
     check(await supabase.from("cameras").update({ roi, entry_line, exit_line, door_point }).eq("id", camera_id));
     return "Camera geometry saved. The edge applies it within a minute.";
+  },
+});
+
+/** The camera's stream address: picked from the cameras the edge found on the Wi-Fi, typed, or "" = automatic. */
+export const setCameraStream = formAction({
+  roles: [...OPS],
+  schema: z.object({ camera_id: z.guid(), stream_url: streamUrlSchema }),
+  revalidate: "/operator",
+  run: async ({ camera_id, stream_url }, { supabase }) => {
+    check(await supabase.from("cameras").update({ stream_url: stream_url || null }).eq("id", camera_id));
+    return stream_url ? "Camera address saved. The edge switches within a minute." : "Set to automatic: the edge uses a camera it finds on the Wi-Fi.";
   },
 });
 

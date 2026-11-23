@@ -105,7 +105,10 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
 
 ## 3. Real classes and live demos with the phones: ONE double-click
 
-1. Phone 1: **IP Webcam** → Start server. iPhone: **IP Camera Lite** → server on, main camera. Same Wi-Fi as the laptop.
+1. Phone 1: **IP Webcam** → Start server. iPhone: **IP Camera Lite** → server on, main camera. Both on the **same
+   Wi-Fi as the laptop**. No addresses to type: the laptop finds the phones by itself (searches every 2 minutes).
+   Wrong way round (door shows the room)? Website: **Operator → Devices → edge-B204 → door / room camera → Use …**
+   (or type the address the camera app shows). "Back to automatic" undoes it.
 2. Double-click **`START-CLASS.bat`** (project folder). By itself it:
    - checks both phone cameras (says which one is not reachable),
    - sends a picture from each camera to the website every 2 min (Operator → Devices → camera: draw the seat area,
@@ -170,6 +173,7 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 - Sync the Windows clock (Settings → Time → Sync now).
 
 ## Done
+- 2026-11-23: cameras found automatically on the Wi-Fi; choose / type a camera on the website (no fixed addresses).
 - 2026-11-23: room camera marks attendance, back-row faces, two-camera exit, tap-your-seat verify, tidier admin, new dashboard panels.
 - 2026-11-23: Admin → Demo page (5 / 10 / 15 min / full class) and the video demo runner are live.
 - 2026-11-23: one-click demo: `demo\START-DEMO.bat` + `demo\videos` folder.

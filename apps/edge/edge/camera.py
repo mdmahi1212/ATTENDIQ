@@ -65,6 +65,7 @@ class Camera:
         self._frame_at = 0.0
         self._seq = 0
         self._stop = threading.Event()
+        self._reopen = threading.Event()  # set_source(): drop the current stream and open the new address
         self._thread: threading.Thread | None = None
         self.online: bool | None = None  # unknown until the first open attempt, so the first state is reported
         self.failures = 0
@@ -79,6 +80,16 @@ class Camera:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=5)
+
+    def set_source(self, source: str) -> bool:
+        """Switch to another stream address while running (picked on the website / found on the network)."""
+        if source == self.source:
+            return False
+        log.info("camera %s: source -> %s", self.name, source or "(none yet)")
+        self.source = source
+        self.failures = 0
+        self._reopen.set()
+        return True
 
     def latest(self) -> tuple[int, np.ndarray | None, float]:
         """(sequence number, frame, monotonic time it was read). Same seq = no new frame."""
@@ -98,8 +109,12 @@ class Camera:
 
     def _run(self) -> None:
         backoff = Backoff()
-        file_mode = is_file(self.source)
         while not self._stop.is_set():
+            self._reopen.clear()
+            if not self.source:  # no address yet: waiting for the website choice / network search
+                self._stop.wait(1.0)
+                continue
+            file_mode = is_file(self.source)
             cap = self._open(self.source)
             if not cap.isOpened():
                 self.failures += 1
@@ -113,7 +128,7 @@ class Camera:
             fps_src = cap.get(5) if file_mode else 0  # CAP_PROP_FPS
             frame_dt = 1.0 / fps_src if fps_src and fps_src > 0 else 0.0
             n, t_fps = 0, time.monotonic()
-            while not self._stop.is_set():
+            while not self._stop.is_set() and not self._reopen.is_set():
                 t_read = time.monotonic()
                 ok, frame = cap.read()
                 if not ok or frame is None:
@@ -127,6 +142,9 @@ class Camera:
                 if frame_dt:  # play files at real-time speed
                     self._sleep(max(0.0, frame_dt - (time.monotonic() - t_read)))
             cap.release()
+            if self._reopen.is_set():  # new address: open it right away
+                backoff.reset()
+                continue
             if file_mode and not self._loop_file:
                 self.ended = True
                 if self._hold_last:

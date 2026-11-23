@@ -34,6 +34,16 @@ def out_side(a: Point, b: Point, door: Point) -> int | None:
     return None if s == 0 else (1 if s > 0 else -1)
 
 
+def stream_choices(cameras: list[dict[str, Any]]) -> dict[str, str]:
+    """kind -> stream address picked on the website (only http(s) addresses)."""
+    out: dict[str, str] = {}
+    for c in cameras:
+        url = str(c.get("stream_url") or "").strip()
+        if c.get("kind") in ("gate", "inside") and url.startswith(("http://", "https://", "rtsp://")):
+            out[str(c["kind"])] = url
+    return out
+
+
 def plan(cameras: list[dict[str, Any]]) -> dict[str, Any]:
     """What to change, from the website rows: {roi, entry_line, exit_line, out_side} (only valid, drawn values)."""
     out: dict[str, Any] = {}

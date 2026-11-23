@@ -24,6 +24,7 @@ function Get-EnvValue([string]$name) {
 Write-Host "Checking the cameras ..." -ForegroundColor Cyan
 foreach ($cam in @(@{ n = "Door camera (phone 1)"; v = "GATE_CAMERA_SOURCE" }, @{ n = "Room camera (phone 2)"; v = "INSIDE_CAMERA_SOURCE" })) {
   $src = Get-EnvValue $cam.v
+  if ($src -eq "" -or $src -eq "auto") { Write-Host "  $($cam.n): automatic (the edge finds the phone on this Wi-Fi; or choose it on the website: Operator -> camera)"; continue }
   if ($src -notmatch '^https?://([^/:]+):?(\d+)?') { Write-Host "  $($cam.n): $src (local device)"; continue }
   $hostName = $Matches[1]; $port = if ($Matches[2]) { [int]$Matches[2] } else { 80 }
   $tcp = New-Object System.Net.Sockets.TcpClient

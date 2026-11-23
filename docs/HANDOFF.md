@@ -114,3 +114,8 @@ Progress:
   actions + review count, professor 'Needs your review', student 'Verify phone'; SimpleCreateForm card; Sections test
   buttons -> Admin -> Demo. Checks: web unit 143, e2e 11/11 (prod build), edge 69, face-api 20, ingest 7, sim 11,
   pycommon 5, lint/ruff/tsc/build clean. NOT verified with real people (videos tomorrow).
+- 2026-11-23 CAMERAS AUTO: GATE/INSIDE_CAMERA_SOURCE=auto (.env + example). edge/discover.py scans this laptop's private
+  /24 networks (ports 8080/8081/4747, keeps MJPEG/JPEG answers; ~2.3 s), every 2 min while a camera lacks a working
+  address; edge/sources.py: website cameras.stream_url > .env address > found (door first, room next). Camera.set_source
+  switches live. Heartbeat status.cameras {found, sources, online}. Website Operator -> camera: 'Camera address' (Use
+  found / type / back to automatic). Laptop was on 172.16.71.0/24 while old addresses were 192.168.219.x.

@@ -32,6 +32,7 @@ from edge.config import Env, load_yaml, resolve
 from edge.gallery import Gallery
 from edge.gate import GatePipeline
 from edge.outbox import Outbox, Publisher
+from edge.sources import is_auto
 
 log = logging.getLogger("edge")
 
@@ -155,14 +156,51 @@ def main(argv: list[str] | None = None) -> int:
 
     snaps = SnapshotSender(api.upload_snapshot)  # pictures for drawing the geometry on the website
 
+    from edge.discover import find_cameras
+    from edge.geometry_sync import stream_choices
+    from edge.sources import choose as choose_source
+
+    # Camera addresses: website choice > .env address > found on the Wi-Fi ("auto"). No address is fixed in code.
+    cams: dict[str, Camera] = {}  # kind -> live (not recorded) camera whose address may change
+    env_src = {"gate": env.gate_camera_source, "inside": env.inside_camera_source}
+    net: dict[str, Any] = {"found": [], "web": {}, "searching": False, "last": 0.0}
+
+    def assign_sources() -> None:
+        taken: set[str] = set()
+        for kind in ("gate", "inside"):
+            cam = cams.get(kind)
+            if cam is None:
+                continue
+            src = choose_source(kind, net["web"], env_src[kind], net["found"], taken)
+            if src:
+                taken.add(src)
+            if cam.set_source(src):
+                log.info("%s camera now %s", "door" if kind == "gate" else "room", src or "(none)")
+
+    def search_network() -> None:
+        try:
+            net["found"] = find_cameras()
+        finally:
+            net["searching"], net["last"] = False, time.monotonic()
+        assign_sources()
+
     def sync_geometry() -> None:
         try:
-            done = apply_geometry(plan_geometry(api.cameras()), cfg, gate, exit_gate, body_exit)
+            rows = api.cameras()
         except EdgeApiError as e:
-            log.warning("camera geometry not loaded: %s", e)
-            return
-        if done:
-            log.info("camera geometry from the website applied: %s", ", ".join(done))
+            log.warning("camera settings not loaded: %s", e)
+            rows = None
+        if rows is not None:
+            net["web"] = stream_choices(rows)
+            done = apply_geometry(plan_geometry(rows), cfg, gate, exit_gate, body_exit)
+            if done:
+                log.info("camera geometry from the website applied: %s", ", ".join(done))
+        assign_sources()
+        # Search the Wi-Fi when a camera has no working address (at most every 2 minutes, in the background).
+        lacking = any(not c.source or c.online is False for c in cams.values())
+        if lacking and not net["searching"] and time.monotonic() - net["last"] > 120:
+            net["searching"] = True
+            threading.Thread(target=search_network, daemon=True, name="camera-search").start()
 
     session_lock = threading.Lock()
 
@@ -247,8 +285,10 @@ def main(argv: list[str] | None = None) -> int:
         emit(Envelope(event_type=et, source_device_id=device_id, session_id=gate.session_id, observed_at=server_now(),
                       payload={"camera": name, "failures": failures}))
 
-    source = args.video or env.gate_camera_source
+    source = args.video or ("" if is_auto(env.gate_camera_source) else env.gate_camera_source)
     camera = Camera("gate", str(resolve(source)) if args.video else source, on_camera, hold_last=args.demo)
+    if not args.video:
+        cams["gate"] = camera
     if not args.demo:  # demo: both recordings start together when the class goes live (main loop)
         camera.start()
 
@@ -428,6 +468,8 @@ def main(argv: list[str] | None = None) -> int:
                     "frame_age_s": {"gate": None if age is None else round(age, 1)},
                     "outbox": outbox.pending_count(), "gallery": len(gallery),
                     "session_id": str(gate.session_id) if gate.session_id else None, "stats": gate.stats,
+                    "cameras": {"found": net["found"], "sources": {k: c.source for k, c in cams.items()},
+                                "online": {k: c.online for k, c in cams.items()}},
                     "exit_stats": exit_gate.stats if exit_gate else None}))
             stop.wait(0.5)
 
@@ -437,7 +479,9 @@ def main(argv: list[str] | None = None) -> int:
     inside_cam: Camera | None = None
     inside_source = str(resolve(args.room_video)) if args.room_video else env.inside_camera_source
     if (cfg.inside.enabled or exit_gate) and inside_source and not args.no_inside and (args.room_video or not args.video):
-        inside_cam = Camera("inside", inside_source, on_camera, hold_last=args.demo)
+        inside_cam = Camera("inside", "" if is_auto(inside_source) else inside_source, on_camera, hold_last=args.demo)
+        if not args.room_video:
+            cams["inside"] = inside_cam
         if not args.demo:
             inside_cam.start()
         if cfg.inside.enabled:  # people counting (off when the inside camera only watches the way out)

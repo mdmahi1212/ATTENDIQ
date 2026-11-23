@@ -17,6 +17,9 @@ def test_website_choice_wins_then_env_then_network() -> None:
 def test_only_private_lan_networks_are_searched() -> None:
     nets = local_networks(["192.168.219.104", "127.0.0.1", "169.254.3.4", "8.8.8.8", "10.1.2.3", "192.168.219.7"])
     assert nets == [ipaddress.IPv4Network("192.168.219.0/24"), ipaddress.IPv4Network("10.1.2.0/24")]
+    # the real netmask counts (campus Wi-Fi /17), never wider than a /16
+    assert local_networks([("172.16.71.24", "255.255.128.0")]) == [ipaddress.IPv4Network("172.16.0.0/17")]
+    assert local_networks([("10.5.6.7", "255.0.0.0")]) == [ipaddress.IPv4Network("10.5.0.0/16")]
 
 
 def test_find_cameras_keeps_only_real_streams_sorted_by_address() -> None:

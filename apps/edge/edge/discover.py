@@ -20,42 +20,68 @@ PATHS = ("/video", "/mjpegfeed", "/live", "/")
 STREAM_TYPES = ("multipart/x-mixed-replace", "image/jpeg")
 
 
-def local_networks(addresses: Iterable[str] | None = None) -> list[ipaddress.IPv4Network]:
-    """Private /24 networks of this machine's IPv4 addresses (Wi-Fi, Ethernet), loopback and link-local skipped."""
+MIN_PREFIX = 16  # never search more than a /16 (65k addresses), even on a huge campus network
+
+
+def local_networks(addresses: Iterable[str | tuple[str, str]] | None = None) -> list[ipaddress.IPv4Network]:
+    """Private networks of this machine's IPv4 addresses with their REAL size (netmask; campus Wi-Fi is often a /17),
+    capped at /16; loopback and link-local skipped. An address without a netmask counts as a /24."""
     if addresses is None:
         addresses = _my_addresses()
     nets: list[ipaddress.IPv4Network] = []
-    for a in addresses:
+    for item in addresses:
+        a, mask = item if isinstance(item, tuple) else (item, "255.255.255.0")
         try:
             ip = ipaddress.IPv4Address(a)
+            net = ipaddress.IPv4Network(f"{ip}/{mask or '255.255.255.0'}", strict=False)
         except ValueError:
             continue
         if ip.is_private and not ip.is_loopback and not ip.is_link_local:
-            net = ipaddress.IPv4Network(f"{ip}/24", strict=False)
+            if net.prefixlen < MIN_PREFIX:
+                net = ipaddress.IPv4Network(f"{ip}/{MIN_PREFIX}", strict=False)
             if net not in nets:
                 nets.append(net)
     return nets
 
 
-def _my_addresses() -> list[str]:
-    out: list[str] = []
+def _my_addresses() -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
     try:
         import psutil
 
         for addrs in psutil.net_if_addrs().values():
-            out += [a.address for a in addrs if a.family == socket.AF_INET]
+            out += [(a.address, a.netmask or "255.255.255.0") for a in addrs if a.family == socket.AF_INET]
     except Exception:  # noqa: BLE001 - psutil missing or blocked: fall back to the default route's address
         pass
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("10.255.255.255", 1))  # no packet is sent; picks the outgoing interface
-            out.append(s.getsockname()[0])
+            out.append((s.getsockname()[0], "255.255.255.0"))
     except OSError:
         pass
     return out
 
 
-def port_open(host: str, port: int, timeout: float = 0.35) -> bool:
+def neighbours() -> list[str]:
+    """IPv4 devices this laptop talked to recently (Windows neighbour / ARP table): searched first, they are fast."""
+    import subprocess
+
+    try:
+        out = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=5).stdout  # noqa: S603, S607
+    except (OSError, subprocess.SubprocessError):
+        return []
+    found: list[str] = []
+    for word in out.split():
+        try:
+            ip = ipaddress.IPv4Address(word)
+        except ValueError:
+            continue
+        if ip.is_private and not ip.is_multicast and not str(ip).endswith(".255") and str(ip) not in found:
+            found.append(str(ip))
+    return found
+
+
+def port_open(host: str, port: int, timeout: float = 0.3) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -84,9 +110,11 @@ def find_cameras(networks: list[ipaddress.IPv4Network] | None = None, skip: Iter
                  prober: Callable[[str, int], str | None] = stream_url) -> list[str]:
     """Stream URLs of the phone cameras on the given (default: this machine's) networks, sorted by address."""
     nets = local_networks() if networks is None else networks
-    me = set(skip) | set(_my_addresses() if networks is None else [])
-    hosts = [str(h) for n in nets for h in n.hosts() if str(h) not in me]
-    with ThreadPoolExecutor(max_workers=128) as pool:
+    me = set(skip) | {a for a, _ in (_my_addresses() if networks is None else [])}
+    near = [h for h in (neighbours() if networks is None else []) if any(ipaddress.IPv4Address(h) in n for n in nets)]
+    rest = [str(h) for n in nets for h in n.hosts()]
+    hosts = [h for h in dict.fromkeys(near + rest) if h not in me]  # recently seen devices first
+    with ThreadPoolExecutor(max_workers=512) as pool:
         open_ports = [hp for hp, ok in zip(((h, p) for h in hosts for p in PORTS),
                                            pool.map(lambda hp: opener(*hp), ((h, p) for h in hosts for p in PORTS)),
                                            strict=True) if ok]

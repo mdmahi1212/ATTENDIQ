@@ -160,7 +160,7 @@ Demo timing (minutes from the start):
 | Website on the laptop | `cd apps\web; npm.cmd run dev` → http://localhost:3000 |
 | Classroom stack (broker, face-api, ingest, edge) | double-click `START-CLASS.bat` (or `scripts\start-live.ps1`) |
 | Face API + tunnel only | `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1` |
-| Simulator class (30 fake students) | `cd apps\simulator; .\.venv\Scripts\python.exe -m simulator run` |
+| Simulator class | removed from the live database on 2026-11-23 (no simulated students left); `supabase/seed.sql` recreates them on a fresh setup |
 | Remove demo / test classes | `powershell -ExecutionPolicy Bypass -File scripts\reset-demo.ps1` (type `RESET`) |
 | Milestone PDF again | `python scripts\make-milestone-pdf.py` → `docs\AttendIQ-Milestone-Report.pdf` |
 | Web tests | `cd apps\web; npm.cmd run lint; npm.cmd run typecheck; npm.cmd test` |
@@ -177,6 +177,7 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 - Sync the Windows clock (Settings → Time → Sync now).
 
 ## Done
+- 2026-11-23: deleted the 30 simulated students (+ their classes and records) and 2 test accounts; real people and the E2E test accounts kept.
 - 2026-11-23: cameras found automatically on the Wi-Fi; choose / type a camera on the website (no fixed addresses).
 - 2026-11-23: room camera marks attendance, back-row faces, two-camera exit, tap-your-seat verify, tidier admin, new dashboard panels.
 - 2026-11-23: Admin → Demo page (5 / 10 / 15 min / full class) and the video demo runner are live.

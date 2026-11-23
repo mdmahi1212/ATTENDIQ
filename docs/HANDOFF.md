@@ -119,3 +119,8 @@ Progress:
   address; edge/sources.py: website cameras.stream_url > .env address > found (door first, room next). Camera.set_source
   switches live. Heartbeat status.cameras {found, sources, online}. Website Operator -> camera: 'Camera address' (Use
   found / type / back to automatic). Laptop was on 172.16.71.0/24 while old addresses were 192.168.219.x.
+- 2026-11-23 DATA: 'Confirm email' OFF in Supabase (user) - sign-up tested on localhost: straight to /student, no email.
+  Deleted (user request, confirmed): 30 simulated students + 21 simulation sessions (cascade: 1,060 attendance, 40
+  enrollments) + 'Signup Test' + 'Duplicate Test Student' (+ its face-review photo via storage API). Kept: Demo Admin,
+  Prof. Demo Kim, Mahi, fahim, Ahammed Tanim, Nahid Hasan, E2E Admin, E2E Student. Simulator / Gate 7 live test now
+  have no SIM students (seed.sql recreates them on a fresh DB).

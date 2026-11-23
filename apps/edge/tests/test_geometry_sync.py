@@ -68,3 +68,15 @@ def test_rotation_from_the_website_is_applied_once() -> None:
     assert apply(p, cfg, gate, None, None) == ["door rotation 90", "room rotation 180"]
     assert (cfg.gate.rotate, cfg.inside.rotate) == (90, 180)
     assert apply(p, cfg, gate, None, None) == []
+
+
+def test_exit_line_on_the_picture_edge_means_out_of_the_picture() -> None:
+    # The real drawing from the demo: a line along the bottom edge, the door dot just above it (room side)
+    rows = [{"kind": "inside", "exit_line": [[0.01, 0.997], [0.9875, 0.9904]], "door_point": [0.9888, 0.9704]}]
+    p = plan(rows)
+    from edge.geometry import side
+
+    a, b = p["exit_line"]
+    assert side((0.5, 1.5), a, b) * p["out_side"] > 0  # below the picture = toward the door
+    assert side((0.5, 0.5), a, b) * p["out_side"] < 0  # the seats = the room side
+    assert plan([{"kind": "inside", "exit_line": [[0.01, 0.997], [0.98, 0.99]], "door_point": None}])["out_side"] == p["out_side"]

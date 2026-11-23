@@ -29,6 +29,15 @@ from edge.gate import FaceDet
 from edge.geometry import Box, Point, crossing, side
 from edge.tracker import IdTracker, IouTracker
 
+
+def seg_dist(p: Point, a: Point, b: Point) -> float:
+    """Distance from p to the segment a-b (pixels)."""
+    ax, ay, bx, by = a[0], a[1], b[0], b[1]
+    dx, dy = bx - ax, by - ay
+    t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy)))
+    return float(((p[0] - ax - t * dx) ** 2 + (p[1] - ay - t * dy) ** 2) ** 0.5)
+
+
 FACE_FRESH_S = 1.0  # a face counts for a body only if it was seen this recently
 MIN_VOTES = 2  # frames in which the same student's face was inside the body before we trust the identity
 
@@ -37,6 +46,7 @@ MIN_VOTES = 2  # frames in which the same student's face was inside the body bef
 class _Who:
     votes: Counter[str] = field(default_factory=Counter)
     counted: set[int] = field(default_factory=set)  # face sightings already counted for this body
+    start: tuple[float, float] | None = None  # where this body was first seen (px, box centre)
     reported: bool = False
 
 
@@ -53,6 +63,7 @@ class BodyExitTracker:
         self._seq = 0
         self.stats = {"out_known": 0, "out_unknown": 0, "skipped_already_out": 0}
         self.vanished: list[tuple[str, float]] = []  # (student, time) named bodies lost near the door
+        self.edge_mode = False  # set when the exit line lies on a picture border (door outside the picture)
         self._lock = threading.Lock()  # faces() runs in the exit loop, update() in the body loop
 
     def reset(self) -> None:
@@ -102,15 +113,36 @@ class BodyExitTracker:
             who = self._who.pop(tr.track_id, None)
             sid = self._identity(who)
             if sid and who and not who.reported and tr.history:
-                # A named body disappeared without crossing the exit line: on the door side, or at the picture's edge
-                # (the door may be outside the picture). The door camera decides if it really left (ExitFusion).
                 x, y = tr.history[-1]
+                feet = ((tr.box[0] + tr.box[2]) / 2, tr.box[3])  # where the person stands, not the box centre
+                near = 0.08 * max(w, h)
+                sx, sy = who.start or tr.history[0]
+                walked = ((x - sx) ** 2 + (y - sy) ** 2) ** 0.5 >= 0.12 * h
+                at_border = tr.box[0] <= 0.02 * w or tr.box[2] >= 0.98 * w or tr.box[3] >= 0.97 * h
+                # was already in the room: seen >= 15 s and first seen away from the side / bottom edges (not arriving)
+                settled = tr.last_seen - tr.first_seen >= 15 and 0.12 * w < sx < 0.88 * w and sy < 0.85 * h
+                if self.edge_mode and walked and at_border and settled:
+                    # Door outside the picture (exit line drawn on a picture edge): someone who got up and walked out
+                    # of the picture at the left / right / bottom edge left. Seen again later = back (the DB fixes it).
+                    who.reported = True
+                    out.append((tr.track_id, who))
+                    continue
+                if seg_dist(feet, a, b) <= near and seg_dist(tr.history[0], a, b) - seg_dist((x, y), a, b) >= 0.12 * h:
+                    # Walked up to the exit line and vanished there (e.g. a line on the picture's edge with the door
+                    # behind the camera: people leave the picture before "crossing"): that is leaving.
+                    who.reported = True
+                    out.append((tr.track_id, who))
+                    continue
+                # Disappeared elsewhere on the door side or at the picture's edge (door outside the picture): the door
+                # camera decides whether it really left (ExitFusion).
                 door_side = side((x, y), a, b) * self.out_side > 0
                 at_edge = min(x, w - x) < 0.1 * w or min(y, h - y) < 0.1 * h
                 if door_side or at_edge:
                     self.vanished.append((sid, tr.last_seen))
         for tr in touched:
             who = self._who.setdefault(tr.track_id, _Who())
+            if who.start is None:
+                who.start = tr.history[-1] if tr.history else None
             x1, y1, x2, y2 = tr.box
             upper = y1 + (y2 - y1) * 0.5  # faces sit in the upper half of a body box
             for (fx, fy), sid, ft, seq in self._faces:

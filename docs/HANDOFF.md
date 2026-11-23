@@ -124,3 +124,9 @@ Progress:
   enrollments) + 'Signup Test' + 'Duplicate Test Student' (+ its face-review photo via storage API). Kept: Demo Admin,
   Prof. Demo Kim, Mahi, fahim, Ahammed Tanim, Nahid Hasan, E2E Admin, E2E Student. Simulator / Gate 7 live test now
   have no SIM students (seed.sql recreates them on a fresh DB).
+- 2026-11-24 DEMO RUN (session bcaf3803, 7-min class, door.mp4 59 fps + room.MOV 30 fps, 6 min): 6 marked present
+  (1 gate, 5 room), Mahi/fahim absent (not in videos); 0 OUT events -> 2 leavers stayed present. Cause: door not in
+  room picture; exit line drawn on the bottom edge, door dot on room side. Fix: edge line -> out = beyond that edge
+  (edge_outside), body 'edge_mode': settled (>=15 s, started away from side/bottom edges) named body that walks out
+  at left/right/bottom edge = OUT. Replay of room.MOV: exactly 2 exits, 1:52 and 4:12 (0 false). Edge 79 tests.
+  Also fixed: camera pages crashed (client component); e2e live tests use temp SIM student.

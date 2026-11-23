@@ -29,6 +29,24 @@ def _pts(v: Any, n: int | None = None) -> list[Point] | None:
     return out
 
 
+EDGE = 0.04  # a line this close to a picture border lies "on the edge"
+
+
+def edge_outside(a: Point, b: Point) -> Point | None:
+    """For a line drawn along a picture border (the door is outside the picture, e.g. behind the camera): a point
+    beyond that border, so 'toward the door' = out of the picture there. None if the line is not on a border."""
+    mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+    if a[1] <= EDGE and b[1] <= EDGE:
+        return (mx, -1.0)  # top
+    if a[1] >= 1 - EDGE and b[1] >= 1 - EDGE:
+        return (mx, 2.0)  # bottom
+    if a[0] <= EDGE and b[0] <= EDGE:
+        return (-1.0, my)  # left
+    if a[0] >= 1 - EDGE and b[0] >= 1 - EDGE:
+        return (2.0, my)  # right
+    return None
+
+
 def out_side(a: Point, b: Point, door: Point) -> int | None:
     """+1 / -1 = which side of the line a->b the door is on (side() sign); None if the point is on the line."""
     s = side(door, a, b)
@@ -55,7 +73,9 @@ def plan(cameras: list[dict[str, Any]]) -> dict[str, Any]:
                 out["roi"] = roi
             line = _pts(c.get("exit_line"), 2)
             door = _pts([c["door_point"]], 1) if c.get("door_point") else None
-            if line and door and (o := out_side(line[0], line[1], door[0])) is not None:
+            # A line along a picture border: the door is beyond that border (no door point needed / possible).
+            beyond = edge_outside(line[0], line[1]) if line else None
+            if line and (beyond or door) and (o := out_side(line[0], line[1], beyond or door[0])) is not None:  # type: ignore[index]
                 out["exit_line"], out["out_side"] = line, o
         elif c.get("kind") == "gate" and (line := _pts(c.get("entry_line"), 2)):
             out["entry_line"] = line
@@ -84,6 +104,7 @@ def apply(changes: dict[str, Any], cfg: Any, gate: Any, exit_gate: Any, body_exi
                 exit_gate.cfg = replace(exit_gate.cfg, line_a=a, line_b=b, in_side=-o)
             if body_exit is not None:
                 body_exit.line_a, body_exit.line_b, body_exit.out_side = a, b, o
+                body_exit.edge_mode = edge_outside(a, b) is not None
             done.append("exit line")
     if "entry_line" in changes:
         a, b = changes["entry_line"]

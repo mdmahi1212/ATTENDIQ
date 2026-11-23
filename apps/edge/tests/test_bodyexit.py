@@ -195,3 +195,69 @@ def test_lost_body_without_anyone_leaving_at_the_door_is_ignored() -> None:
     f.room_vanished([("stu-a", 10.0)])
     f.door_leaving(40.0)  # much later: someone else
     assert out == []
+
+
+def test_named_body_walking_out_of_the_bottom_of_the_picture_is_reported() -> None:
+    # Door behind the camera: exit line drawn along the bottom edge; leavers vanish there before "crossing" it.
+    g = Gallery()
+    g.load(GALLERY)
+    reports: list[tuple[str | None, dict]] = []
+    tr = BodyExitTracker((0.0, 0.99), (1.0, 0.99), -1, g, SessionMemory(), Thresholds(), lambda s, p: reports.append((s, p)))
+    seat = (300, 150, 380, 330)  # sitting in the middle of the room
+    for k in range(3):
+        tr.faces([FaceDet((320, 160, 360, 200), 0.9, near(A, 0.8, 50 + k))], k * 0.2)
+        tr.update([seat], W, H, k * 0.2)
+    for k, y in enumerate(range(360, 480, 20)):  # walks toward the camera, box bottom reaches the picture's edge
+        tr.update([(290, y - 220, 390, min(y, 479))], W, H, 1.0 + k * 0.2)
+    for k in range(8):  # gone (out of the picture, under the camera)
+        tr.update([], W, H, 2.4 + k * 0.2)
+    assert [sid for sid, _ in reports] == ["stu-a"]
+
+
+def test_a_seated_student_lost_in_the_middle_is_not_reported() -> None:
+    g = Gallery()
+    g.load(GALLERY)
+    reports: list[tuple[str | None, dict]] = []
+    tr = BodyExitTracker((0.0, 0.99), (1.0, 0.99), -1, g, SessionMemory(), Thresholds(), lambda s, p: reports.append((s, p)))
+    for k in range(3):
+        tr.faces([FaceDet((320, 160, 360, 200), 0.9, near(A, 0.8, 60 + k))], k * 0.2)
+        tr.update([(300, 150, 380, 330)], W, H, k * 0.2)
+    for k in range(8):  # hidden behind someone, far from the line
+        tr.update([], W, H, 0.6 + k * 0.2)
+    assert reports == []
+
+
+def _edge_tracker(reports: list) -> BodyExitTracker:  # noqa: ANN001
+    g = Gallery()
+    g.load(GALLERY)
+    tr = BodyExitTracker((0.0, 0.99), (1.0, 0.99), -1, g, SessionMemory(), Thresholds(), lambda s, p: reports.append((s, p)))
+    tr.edge_mode = True  # exit line drawn on the picture's edge: the door is outside the picture
+    return tr
+
+
+def test_edge_mode_settled_student_walking_out_the_left_edge_left() -> None:
+    reports: list = []
+    tr = _edge_tracker(reports)
+    for k in range(80):  # sits mid-room for 16 s, face seen
+        if k < 3:
+            tr.faces([FaceDet((320, 160, 360, 200), 0.9, near(A, 0.8, 70 + k))], k * 0.2)
+        tr.update([(300, 150, 380, 330)], W, H, k * 0.2, ids=[9])
+    for k, x in enumerate(range(260, 0, -60)):  # gets up, walks out of the picture on the left
+        tr.update([(max(0, x - 40), 140, x + 40, 400)], W, H, 16.0 + k * 0.2, ids=[9])
+    for k in range(8):
+        tr.update([], W, H, 17.0 + k * 0.2, ids=[])
+    assert [sid for sid, _ in reports] == ["stu-a"]
+
+
+def test_edge_mode_someone_arriving_through_the_bottom_is_not_leaving() -> None:
+    reports: list = []
+    tr = _edge_tracker(reports)
+    for k in range(3):
+        tr.faces([FaceDet((320, 300, 360, 340), 0.9, near(A, 0.8, 80 + k))], k * 0.2)
+    for k, y in enumerate(range(479, 300, -30)):  # walks in from the bottom ...
+        tr.update([(300, y - 250, 380, y)], W, H, k * 0.2, ids=[4])
+    for k, y in enumerate(range(330, 479, 30)):  # ... changes their mind after a few seconds and walks back out
+        tr.update([(300, y - 250, 380, min(y, 479))], W, H, 2.0 + k * 0.2, ids=[4])
+    for k in range(8):
+        tr.update([], W, H, 4.0 + k * 0.2, ids=[])
+    assert reports == []  # never settled in the room: not a "left the class"

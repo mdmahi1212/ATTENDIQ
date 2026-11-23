@@ -219,33 +219,51 @@ def _waiting_jpeg() -> bytes:
 
 WAITING = _waiting_jpeg()
 
-PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>AttendIQ live view</title>
-<style>body{margin:0;font-family:system-ui,sans-serif;background:#111;color:#eee}
-h1{font-size:18px;font-weight:500;margin:12px 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:12px;padding:0 16px 16px}
-figure{margin:0}img{width:100%;border-radius:8px;background:#222}figcaption{font-size:13px;color:#aaa;margin:6px 2px}
-.box{display:flex;gap:16px;align-items:center;background:#1b1b1b;border-radius:8px;padding:20px;min-height:120px}
-.bulb{width:72px;height:72px;border-radius:50%;background:#333;box-shadow:inset 0 0 12px #000;transition:all .15s}
-.bulb.green{background:#2ecc40;box-shadow:0 0 36px 10px #2ecc40aa}.bulb.red{background:#ff3b30;box-shadow:0 0 36px 10px #ff3b30aa}
-.bulb.amber{background:#ffb000;box-shadow:0 0 36px 10px #ffb000aa}
-.k{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 12px}
+PAGE = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AttendIQ live view</title>
+<style>
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:system-ui,sans-serif;background:#0d0f14;color:#e8e8ee;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:8px 14px;background:#151821;border-bottom:1px solid #252a36}
+header b{font-weight:600}.k{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.legend{font-size:12px;color:#aab;display:flex;flex-wrap:wrap;gap:4px 12px}
+.led{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px}
+.bulb{width:26px;height:26px;border-radius:50%;background:#333;box-shadow:inset 0 0 8px #000;transition:all .15s}
+.bulb.green{background:#2ecc40;box-shadow:0 0 22px 6px #2ecc40aa}.bulb.red{background:#ff3b30;box-shadow:0 0 22px 6px #ff3b30aa}
+.bulb.amber{background:#ffb000;box-shadow:0 0 22px 6px #ffb000aa}
+main{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:10px;padding:10px}
+.cam{position:relative;min-height:0;display:flex;flex-direction:column;background:#151821;border:1px solid #252a36;border-radius:12px;overflow:hidden}
+.cam .bar{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px;color:#cfd2dc}
+.cam .bar span{flex:1}.cam button{background:#252a36;color:#e8e8ee;border:0;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
+.cam button.on{background:#4f46e5}
+.cam img{flex:1;min-height:0;width:100%;height:100%;object-fit:contain;background:#000;cursor:zoom-in}
+@media (min-width:1100px){main{height:calc(100vh - 52px)}.cam img{height:auto;max-height:calc(100vh - 100px)}}
+.cam:fullscreen img{max-height:none;height:100%;cursor:zoom-out}
 </style></head><body>
-<h1>AttendIQ — live AI view (local only, nothing is stored)
-<span class="k" style="background:#3cb43c"></span>recognised
-<span class="k" style="background:#dc2828"></span>unknown
-<span class="k" style="background:#e6a000"></span>left
-<span class="k" style="background:#969696"></span>too small / not counted
-<span class="k" style="background:#2896e6"></span>body</h1>
-<div class="grid">
-<figure><img src="/gate.mjpg" alt="door camera"><figcaption>Door camera: faces (InsightFace) + bodies (YOLO, blue)</figcaption></figure>
-<figure><img src="/inside.mjpg" alt="room camera"><figcaption>Room camera: bodies + count (YOLO); faces for who leaves</figcaption></figure>
-<figure><img src="/exit.mjpg" alt="way-out camera"><figcaption>Way-out camera: recognising people who leave (if enabled)</figcaption></figure>
-<figure class="led"><div class="box"><div id="led" class="bulb"></div><div><b>ESP32 door LED</b> (simulated, no board)<br>
-<span id="ledtxt">waiting</span></div></div><figcaption>Green = recognised at the door · Red = unknown face · Amber = someone left</figcaption></figure>
-</div>
+<header>
+<b>AttendIQ live AI view</b><span style="font-size:12px;color:#889">local only, nothing is stored</span>
+<div class="legend"><span><i class="k" style="background:#3cb43c"></i>recognised</span><span><i class="k" style="background:#dc2828"></i>unknown</span>
+<span><i class="k" style="background:#e6a000"></i>left</span><span><i class="k" style="background:#969696"></i>too small</span>
+<span><i class="k" style="background:#2896e6"></i>body</span></div>
+<div class="led" title="Simulated ESP32 door LED (no board)"><div id="led" class="bulb"></div><span><b>Door LED</b> <span id="ledtxt">waiting</span></span></div>
+</header>
+<main>
+<section class="cam"><div class="bar"><span>Door camera: faces (InsightFace) + bodies (YOLO)</span></div>
+<img src="/gate.mjpg" alt="door camera" title="Click: full screen"></section>
+<section class="cam"><div class="bar"><span id="roomcap">Room camera: bodies + count (YOLO)</span>
+<button id="b-inside" class="on" type="button">Bodies</button><button id="b-exit" type="button">Faces / who leaves</button></div>
+<img id="room" src="/inside.mjpg" alt="room camera" title="Click: full screen"></section>
+</main>
 <script>
 const led=document.getElementById("led"),txt=document.getElementById("ledtxt");
-const say={ok:"recognised - door LED green",unknown:"unknown face - door LED red",left:"someone left - LED amber",off:"waiting"};
+const say={ok:"recognised (green)",unknown:"unknown face (red)",left:"someone left (amber)",off:"waiting"};
 async function poll(){try{const r=await(await fetch("/led.json",{cache:"no-store"})).json();
-led.className="bulb "+r.color;txt.textContent=r.last==="off"?"waiting":say[r.last]+" ("+r.seconds_ago+" s ago)";}catch(e){}
-setTimeout(poll,250);}poll();
+led.className="bulb "+r.color;txt.textContent=r.last==="off"?"waiting":say[r.last]+" · "+r.seconds_ago+" s ago";}catch(e){}
+setTimeout(poll,300);}poll();
+const room=document.getElementById("room"),cap=document.getElementById("roomcap");
+function show(which){room.src="/"+which+".mjpg";document.getElementById("b-inside").classList.toggle("on",which==="inside");
+document.getElementById("b-exit").classList.toggle("on",which==="exit");
+cap.textContent=which==="inside"?"Room camera: bodies + count (YOLO)":"Room camera: faces, who is in the room, who leaves";}
+document.getElementById("b-inside").onclick=()=>show("inside");document.getElementById("b-exit").onclick=()=>show("exit");
+for(const img of document.querySelectorAll(".cam img")){img.onclick=()=>{const c=img.closest(".cam");
+if(document.fullscreenElement)document.exitFullscreen();else c.requestFullscreen&&c.requestFullscreen();};}
 </script></body></html>"""

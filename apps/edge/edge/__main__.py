@@ -366,6 +366,10 @@ def main(argv: list[str] | None = None) -> int:
                 session_seen = gate.session_id
                 counter.reset()
             _, frame, _ = cam.latest()
+            if frame is not None and gate.session_id is None and liveview and liveview.due("inside"):
+                from edge.liveview import caption_only  # camera test without a class: plain picture
+
+                liveview.update("inside", caption_only(rotate_frame(frame, cfg.inside.rotate), "room camera | no class running"))
             if frame is not None and snaps.due("inside"):
                 snaps.offer("inside", rotate_frame(frame, cfg.inside.rotate))
             if frame is not None and gate.session_id is not None:
@@ -510,6 +514,11 @@ def main(argv: list[str] | None = None) -> int:
             seq, frame, _ = camera.latest()
             if frame is not None and snaps.due("gate"):
                 snaps.offer("gate", rotate_frame(frame, rotation))
+            if frame is not None and gate.session_id is None and liveview and liveview.due("gate"):
+                # Camera test without a class: show the plain picture (no detection runs, nothing is sent).
+                from edge.liveview import caption_only
+
+                liveview.update("gate", caption_only(rotate_frame(frame, rotation), "door camera | no class running"))
             if frame is None or seq == last_seq or gate.session_id is None:
                 time.sleep(0.01)
                 continue

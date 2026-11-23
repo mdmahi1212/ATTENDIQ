@@ -62,6 +62,13 @@ def draw_faces(frame: np.ndarray, faces: Sequence[FaceDet], gallery: Gallery, me
     return out
 
 
+def caption_only(frame: np.ndarray, text: str) -> np.ndarray:
+    """The camera picture with a caption only (camera test while no class is running)."""
+    out = frame.copy()
+    _caption(out, text)
+    return out
+
+
 def draw_bodies(frame: np.ndarray, boxes: Sequence[Box]) -> np.ndarray:
     """Thin blue body boxes under the face boxes (door camera)."""
     import cv2

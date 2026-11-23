@@ -100,6 +100,9 @@ In the presentation press **5 min** instead of 10 min. Person 4 must finish "Ver
 | 3 | absent (left and did not come back) |
 | everyone else enrolled | absent |
 
+Someone who leaves without the door camera naming them is still marked absent at the end when the room camera
+stopped seeing them and the room count is short (the professor is told and can change it).
+
 If something goes wrong: take a photo of the black window and send it to Claude. Logs: `demo\logs\`.
 Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4> -Room <room.mp4>`, then Admin â†’ Demo â†’ 10 min.
 

@@ -155,3 +155,12 @@ Progress:
   /api/edge/v1/sessions/[id]/final-check. Web: End session = request -> panel (auto refresh) -> End again closes;
   'End now without check'; lib/final-check.ts endStep. Hardening: single edge lock (127.0.0.1:47811),
   start-classroom restarts edge/ingest after a crash. Tests: edge 84, web 155. Rolled-back SQL test OK.
+- 2026-11-24 DEMO RUN 3 (session d7b40000) + RULE G: result Fahad present (OUT 2:04 still wrongly named Fahad, but the
+  room camera saw him after -> kept present), Nahid + jidan present (WRONG: no OUT was ever named for them). Migration
+  20261123163332 leavers_not_named (applied): finalize rule G - with room recognition and end count (final check, else
+  median of the last 2 min, minus staff_count) below the number marked present, the students the room camera stopped
+  recognising longest ago (>= max(90 s, 4% of the class) before its last recognition, nothing newer) -> absent
+  left_no_return, at most the shortfall; staff notified. Replay of d7b40000 (rolled back) = exactly the user truth
+  (present Tanim, Fahad, Jjjj, Sourav; absent Nahid, jidan, Mahi, fahim). SQL test G added (8 checks pass, rolled
+  back). Still open: body->name voting swaps neighbours (Nahid/Fahad) in the demo video; room count undercounts (max 4
+  of 6). The final check during demo must run BEFORE the videos end (held last frame = no new faces).

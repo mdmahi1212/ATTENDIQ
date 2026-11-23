@@ -304,6 +304,41 @@ insert into tap(line) select ok(exists (select 1 from public.audit_log where ent
 insert into tap(line) select ok(exists (select 1 from public.notifications where user_id = tests.s(1) and type = 'marked_absent'
   and data->>'session_id' = tests.sid(12)::text), 'student told they were marked absent');
 
+-- ============================================================ G: left without the door naming them (room camera + end count)
+-- s1 seen in the room only early, s2 seen until the end, s3 seen until the end but head down at the very end is fine;
+-- s4 last seen at 30 min. Room count at the end = 3 people (professor + 2 students): 2 of 4 marked students are gone.
+select tests.session(19);
+select tests.apply(jsonb_build_array(
+  tests.rec(tests.sid(19), tests.s(1), tests.t(19, 1)),
+  tests.rec(tests.sid(19), tests.s(2), tests.t(19, 2)),
+  tests.rec(tests.sid(19), tests.s(3), tests.t(19, 3)),
+  tests.rec(tests.sid(19), tests.s(4), tests.t(19, 4)),
+  tests.ev('ROOM_SEEN', tests.sid(19), tests.t(19, 6), jsonb_build_object('student_id', tests.s(1))),
+  tests.ev('ROOM_SEEN', tests.sid(19), tests.t(19, 30), jsonb_build_object('student_id', tests.s(4))),
+  tests.ev('ROOM_SEEN', tests.sid(19), tests.t(19, 68), jsonb_build_object('student_id', tests.s(3))),
+  tests.ev('ROOM_SEEN', tests.sid(19), tests.t(19, 70), jsonb_build_object('student_id', tests.s(2))),
+  tests.ev('OCCUPANCY_UPDATED', tests.sid(19), tests.t(19, 74), '{"raw":3,"smoothed":3,"stable":true}')));
+create temp table fin_g as select public.finalize_session(tests.sid(19), tests.t(19, 75)) as r;
+insert into tap(line) select is(tests.st(tests.sid(19), tests.s(1)), 'absent', 'not seen in the room since minute 6, count short -> absent');
+insert into tap(line) select is(tests.st(tests.sid(19), tests.s(4)), 'absent', 'not seen since minute 30, count short -> absent');
+insert into tap(line) select ok('left_no_return' = any((tests.att(tests.sid(19), tests.s(4))).flags), 'flagged left_no_return');
+insert into tap(line) select is(tests.st(tests.sid(19), tests.s(2)), 'present', 'seen in the room at the end -> present');
+insert into tap(line) select is(tests.st(tests.sid(19), tests.s(3)), 'present', 'seen 2 min before the last sighting -> present');
+insert into tap(line) select is(((select r from fin_g)->>'not_in_room_at_end')::int, 2, 'finalize reports 2 not_in_room_at_end');
+insert into tap(line) select ok(exists (select 1 from public.notifications where user_id = tests.prof() and type = 'left_no_return'
+  and data->>'session_id' = tests.sid(19)::text), 'professor told');
+
+-- same picture, but the room count at the end matches -> nobody changed
+select tests.session(20);
+select tests.apply(jsonb_build_array(
+  tests.rec(tests.sid(20), tests.s(1), tests.t(20, 1)),
+  tests.rec(tests.sid(20), tests.s(2), tests.t(20, 2)),
+  tests.ev('ROOM_SEEN', tests.sid(20), tests.t(20, 6), jsonb_build_object('student_id', tests.s(1))),
+  tests.ev('ROOM_SEEN', tests.sid(20), tests.t(20, 70), jsonb_build_object('student_id', tests.s(2))),
+  tests.ev('OCCUPANCY_UPDATED', tests.sid(20), tests.t(20, 74), '{"raw":3,"smoothed":3,"stable":true}')));
+select public.finalize_session(tests.sid(20), tests.t(20, 75));
+insert into tap(line) select is(tests.st(tests.sid(20), tests.s(1)), 'present', 'head down but the count says everyone is there -> present');
+
 -- ============================================================ F: gate camera offline -> pending, not absent
 select tests.session(5);
 select tests.apply(jsonb_build_array(

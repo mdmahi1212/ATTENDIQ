@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEMO_LENGTHS, demoPolicy, describeDemo, fullClassMinutes, withDemoPolicy } from "@/lib/demo";
 
 describe("demo class timing", () => {
-  it.each(DEMO_LENGTHS)("keeps the rule order inside a %i-minute class", (m) => {
+  it.each([...DEMO_LENGTHS, 6, 7, 8, 9, 11, 12, 13, 14])("keeps the rule order inside a %i-minute class", (m) => {
     const p = demoPolicy(m);
     expect(p.present_until_min).toBeGreaterThanOrEqual(1);
     expect(p.present_until_min).toBeLessThan(p.late_until_min);

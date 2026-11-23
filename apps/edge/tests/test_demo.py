@@ -14,9 +14,10 @@ def test_missing_folder_has_no_pairs(tmp_path: Path) -> None:
     assert find_pairs(tmp_path / "nope") == []
 
 
-def test_class_length_covers_the_recording() -> None:
+def test_class_length_matches_the_recording() -> None:
     assert class_minutes(4.75 * 60) == 5
-    assert class_minutes(6 * 60) == 5
+    assert class_minutes(6 * 60) == 6  # a 6-minute video -> a 6-minute class
+    assert class_minutes(6 * 60 + 2) == 6  # a few seconds over still fits
+    assert class_minutes(6 * 60 + 20) == 7
     assert class_minutes(9.5 * 60) == 10
-    assert class_minutes(11 * 60) == 10
-    assert class_minutes(14 * 60) == 15
+    assert class_minutes(30 * 60) == 15  # longest demo class

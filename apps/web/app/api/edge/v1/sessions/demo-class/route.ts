@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 /**
  * One-click recorded demo (demo\START-DEMO.bat on the classroom laptop): the edge starts a short real demo class
- * (5 / 10 / 15 min, demo clock) for a section taught in the edge's own room. Refused while a class is live there.
+ * (5-15 min = the recording length, demo clock) for a section taught in the edge's own room. Refused while a class is live there.
  */
 export async function POST(request: NextRequest) {
   const device = await requireDevice(request, ["edge"]);

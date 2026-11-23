@@ -3,7 +3,7 @@
 Put the two recordings in demo\\videos\\ as door*.mp4 (phone 1, outside the door) and room*.mp4 (phone 2, inside),
 with the same ending for one pair: door.mp4 + room.mp4, door5.mp4 + room5.mp4 ... (.mov / .m4v / .avi / .mkv too).
 
-It then, by itself: picks the class length from the video length (<= 6 min -> 5-minute class, <= 11 -> 10, else 15),
+It then, by itself: picks the class length from the video length (rounded up to whole minutes, 5-15),
 starts the face API (for "Verify now" on Person 4's phone) if it is not running, starts a real demo class on the
 website, opens the live camera view and the class's live dashboard, and plays both recordings as the door and room
 cameras until the class ends. Camera settings: apps\\edge\\config.demo.yaml when it exists, else config.yaml.
@@ -57,9 +57,10 @@ def find_pairs(folder: Path) -> list[Pair]:
 
 
 def class_minutes(video_seconds: float) -> int:
-    """Shortest demo class that covers the recording (5 / 10 / 15 minutes)."""
-    m = video_seconds / 60
-    return 5 if m <= 6 else 10 if m <= 11 else 15
+    """Class length = the recording rounded UP to a whole minute (5..15), so the class ends when the video does."""
+    import math
+
+    return max(5, min(15, math.ceil(video_seconds / 60 - 0.05)))  # 6:02 of video -> 7 min would waste a minute: 3 s slack
 
 
 def video_seconds(path: Path) -> float:

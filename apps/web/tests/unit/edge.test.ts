@@ -27,10 +27,13 @@ describe("edge API schemas", () => {
 });
 
 describe("one-click demo class request", () => {
-  it("accepts a section code and 5 / 10 / 15 minutes only", async () => {
+  it("accepts a section code and 5-15 whole minutes", async () => {
     const { demoClassSchema } = await import("@/lib/edge/schemas");
     expect(demoClassSchema.safeParse({ section: "IOT401-01", minutes: 10 }).success).toBe(true);
     expect(demoClassSchema.safeParse({ section: "IOT401-01", minutes: 5 }).success).toBe(true);
+    expect(demoClassSchema.safeParse({ section: "IOT401-01", minutes: 6 }).success).toBe(true);
+    expect(demoClassSchema.safeParse({ section: "IOT401-01", minutes: 4 }).success).toBe(false);
+    expect(demoClassSchema.safeParse({ section: "IOT401-01", minutes: 6.5 }).success).toBe(false);
     expect(demoClassSchema.safeParse({ section: "IOT401-01", minutes: 75 }).success).toBe(false);
     expect(demoClassSchema.safeParse({ section: "IOT401", minutes: 10 }).success).toBe(false);
     expect(demoClassSchema.safeParse({ section: "iot401-01; drop", minutes: 10 }).success).toBe(false);

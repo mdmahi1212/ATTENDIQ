@@ -130,3 +130,8 @@ Progress:
   (edge_outside), body 'edge_mode': settled (>=15 s, started away from side/bottom edges) named body that walks out
   at left/right/bottom edge = OUT. Replay of room.MOV: exactly 2 exits, 1:52 and 4:12 (0 false). Edge 79 tests.
   Also fixed: camera pages crashed (client component); e2e live tests use temp SIM student.
+- 2026-11-24 DOOR SLOW: in the demo the door analysed ~4 fps (heartbeat frames 50 in 13 s) because the room camera's
+  tiled face search (133 ms/look, 4 tiles) held the shared face model and the door skipped every 2nd frame; walk-ins
+  show a usable face ~2 s (70->200 px, checked frame by frame) -> tracks fragmented, only 2 of ~9 decided.
+  Fix: exit.max_fps 2 (room face looks/s), gate.process_every_nth 1 (config.py default + config.yaml/example).
+  GPU benchmark: door face 35 ms, room tiled 133 ms, yolo 25 ms -> door ~20 fps. NOT yet re-run with the videos.

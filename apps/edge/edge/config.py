@@ -36,7 +36,7 @@ class Env(BaseSettings):
 
 
 class GateYaml(BaseModel):
-    process_every_nth: int = 2
+    process_every_nth: int = 1  # door: every new frame (GPU); 2 on a CPU-only laptop
     rotate: int = 0  # clockwise degrees (0/90/180/270) applied to gate frames before detection
     det_size: int = 640
     device: str = "auto"  # face detection + recognition: auto = NVIDIA GPU if it works, else CPU; or "cpu"
@@ -115,6 +115,8 @@ class ExitYaml(BaseModel):
     body_tracking: bool = True
     # Room camera face search on an n x n grid of tiles (2 = 4 tiles): finds back-row faces. 1 = off.
     tiles: int = 2
+    # Room camera face searches per second (the door camera gets the face model the rest of the time).
+    max_fps: float = 2.0
 
     def to_gate_config(self, gate: GateYaml) -> GateConfig:
         # GateConfig.in_side names the ROOM side; for an exit-only camera the room is opposite the door side.

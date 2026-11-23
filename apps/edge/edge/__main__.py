@@ -416,6 +416,7 @@ def main(argv: list[str] | None = None) -> int:
         log.info("exit recognition ready on the inside camera; line %s -> %s, out_side %s",
                  cfg.exit.line_a, cfg.exit.line_b, cfg.exit.out_side)
         last, k = -1, 0
+        next_at = 0.0
         while not stop.is_set():
             seq, frame, _ = cam.latest()
             if frame is None or seq == last or pipeline.session_id is None:
@@ -424,6 +425,12 @@ def main(argv: list[str] | None = None) -> int:
             last, k = seq, k + 1
             if k % max(1, cfg.exit.process_every_nth):
                 continue
+            # The room camera's (tiled) face search shares the face model with the door camera: cap it so the
+            # door, where people walk past in ~2 s, always gets the model (seated people need only a few looks).
+            if time.monotonic() < next_at:
+                stop.wait(0.01)
+                continue
+            next_at = time.monotonic() + 1.0 / max(0.5, cfg.exit.max_fps)
             frame = rotate_frame(frame, cfg.inside.rotate)
             faces = detect(frame, cfg.exit.tiles)
             now = time.monotonic()

@@ -2,7 +2,7 @@
 room_code: B204
 
 gate:
-  process_every_nth: 2        # run face detection on every Nth new frame (CPU budget)
+  process_every_nth: 1        # every new frame (GPU); 2 on a CPU-only laptop
   rotate: 0                   # clockwise degrees; 90 for a phone held in PORTRAIT with IP Webcam (it streams sideways)
   det_size: 640               # SCRFD input size
   min_face_px: 60             # smaller faces are tracked but not used for recognition

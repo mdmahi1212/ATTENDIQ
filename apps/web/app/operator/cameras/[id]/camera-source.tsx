@@ -1,12 +1,13 @@
 import { Wifi } from "lucide-react";
 import { ActionForm, RowAction, SubmitButton, TextField } from "@/components/form";
-import { setCameraStream } from "../../actions";
+import { setCameraRotation, setCameraStream } from "../../actions";
 
 /** Which phone this camera is: picked from the cameras the edge found on the Wi-Fi, typed, or automatic. */
-export function CameraSource({ cameraId, kind, picked, status }: {
+export function CameraSource({ cameraId, kind, picked, rotate, status }: {
   cameraId: string;
   kind: "gate" | "inside";
   picked: string;
+  rotate: number | null;
   status: { found: string[]; sources: Record<string, string>; online: Record<string, boolean | null> };
 }) {
   const now = status.sources[kind] ?? "";
@@ -50,6 +51,19 @@ export function CameraSource({ cameraId, kind, picked, status }: {
           </>
         )}
       </ActionForm>
+      <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="camera-rotate">
+        <span className="text-xs text-muted-foreground">Picture sideways or upside down? Turn it:</span>
+        {[0, 90, 180, 270].map((r) => (
+          <RowAction
+            key={r}
+            action={setCameraRotation}
+            fields={{ camera_id: cameraId, rotate: String(r) }}
+            label={`${rotate === r ? "✓ " : ""}${r}°`}
+            variant={rotate === r ? "default" : "outline"}
+          />
+        ))}
+        {rotate === null && <span className="text-xs text-muted-foreground">(now: the laptop&apos;s own setting)</span>}
+      </div>
       {picked && (
         <div className="mt-2">
           <RowAction action={setCameraStream} fields={{ camera_id: cameraId, stream_url: "" }} label="Back to automatic" variant="ghost" />

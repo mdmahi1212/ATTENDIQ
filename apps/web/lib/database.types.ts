@@ -250,6 +250,7 @@ export type Database = {
           id: string
           kind: string
           roi: Json | null
+          rotate: number | null
           snapshot_at: string | null
           snapshot_path: string | null
           stream_url: string | null
@@ -262,6 +263,7 @@ export type Database = {
           id?: string
           kind: string
           roi?: Json | null
+          rotate?: number | null
           snapshot_at?: string | null
           snapshot_path?: string | null
           stream_url?: string | null
@@ -274,6 +276,7 @@ export type Database = {
           id?: string
           kind?: string
           roi?: Json | null
+          rotate?: number | null
           snapshot_at?: string | null
           snapshot_path?: string | null
           stream_url?: string | null

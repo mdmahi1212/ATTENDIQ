@@ -11,7 +11,7 @@ export default async function CameraPage({ params }: PageProps<"/operator/camera
   const supabase = await createClient();
   const { data: cam } = await supabase
     .from("cameras")
-    .select("id, kind, stream_url, roi, entry_line, exit_line, door_point, snapshot_path, snapshot_at, edge_devices(name, status, rooms(code))")
+    .select("id, kind, stream_url, rotate, roi, entry_line, exit_line, door_point, snapshot_path, snapshot_at, edge_devices(name, status, rooms(code))")
     .eq("id", id)
     .maybeSingle();
   if (!cam) notFound();
@@ -32,6 +32,7 @@ export default async function CameraPage({ params }: PageProps<"/operator/camera
         cameraId={cam.id}
         kind={cam.kind as "gate" | "inside"}
         picked={cam.stream_url ?? ""}
+        rotate={cam.rotate}
         status={edgeCameraStatus(cam.edge_devices?.status ?? null)}
       />
       <CameraEditor

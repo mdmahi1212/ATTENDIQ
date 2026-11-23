@@ -96,6 +96,17 @@ export const setCameraStream = formAction({
   },
 });
 
+/** Turn the camera picture (phone held sideways / upside down). The edge applies it within a minute. */
+export const setCameraRotation = formAction({
+  roles: [...OPS],
+  schema: z.object({ camera_id: z.guid(), rotate: z.coerce.number().int().refine((n) => [0, 90, 180, 270].includes(n)) }),
+  revalidate: "/operator",
+  run: async ({ camera_id, rotate }, { supabase }) => {
+    check(await supabase.from("cameras").update({ rotate }).eq("id", camera_id));
+    return `Picture turned to ${rotate}°. The edge applies it within a minute; refresh the live view.`;
+  },
+});
+
 export const setSnapshotPath = formAction({
   roles: [...OPS],
   schema: z.object({ camera_id: z.guid(), path: z.string().min(3).max(300) }),

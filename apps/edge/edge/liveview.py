@@ -62,6 +62,22 @@ def draw_faces(frame: np.ndarray, faces: Sequence[FaceDet], gallery: Gallery, me
     return out
 
 
+def draw_preview(frame: np.ndarray, faces: Sequence[FaceDet], bodies: Sequence[Box], text: str) -> np.ndarray:
+    """Camera test without a class: what the models see (faces with detection / anti-spoof scores, bodies), no names:
+    the class face list only reaches the laptop while a class is live."""
+    import cv2
+
+    out = draw_bodies(frame, bodies)
+    for f in faces:
+        x1, y1, x2, y2 = (int(v) for v in f.box)
+        live = "" if f.live_score is None else f" | real {f.live_score:.2f}"
+        colour = GREY if f.embedding is None else BODY
+        cv2.rectangle(out, (x1, y1), (x2, y2), colour, 3)
+        cv2.putText(out, f"face {f.det_score:.2f}{live}", (x1, max(20, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, colour, 2)
+    _caption(out, text)
+    return out
+
+
 def caption_only(frame: np.ndarray, text: str) -> np.ndarray:
     """The camera picture with a caption only (camera test while no class is running)."""
     out = frame.copy()

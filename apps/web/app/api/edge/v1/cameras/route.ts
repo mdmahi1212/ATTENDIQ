@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (device instanceof Response) return device;
   const { data, error } = await createAdminClient()
     .from("cameras")
-    .select("kind, stream_url, roi, entry_line, exit_line, door_point")
+    .select("kind, stream_url, rotate, roi, entry_line, exit_line, door_point")
     .eq("device_id", device.id);
   if (error) return json({ error: "lookup failed" }, 500);
   return json({ cameras: data ?? [] });

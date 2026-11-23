@@ -58,3 +58,13 @@ def test_snapshot_sender_sends_right_away_then_waits() -> None:
     time.sleep(0.05)
     assert sent[0][0] == "gate" and sent[0][1] > 100
     assert not s.due("gate") and s.due("inside")
+
+
+def test_rotation_from_the_website_is_applied_once() -> None:
+    cfg = SimpleNamespace(gate=GateYaml(), inside=InsideYaml(), exit=ExitYaml())
+    gate = SimpleNamespace(cfg=GateConfig())
+    p = plan([{"kind": "gate", "rotate": 90}, {"kind": "inside", "rotate": 180}, {"kind": "gate", "rotate": 45}])
+    assert p == {"rotate_gate": 90, "rotate_inside": 180}
+    assert apply(p, cfg, gate, None, None) == ["door rotation 90", "room rotation 180"]
+    assert (cfg.gate.rotate, cfg.inside.rotate) == (90, 180)
+    assert apply(p, cfg, gate, None, None) == []

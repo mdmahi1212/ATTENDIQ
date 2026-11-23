@@ -59,12 +59,19 @@ def plan(cameras: list[dict[str, Any]]) -> dict[str, Any]:
                 out["exit_line"], out["out_side"] = line, o
         elif c.get("kind") == "gate" and (line := _pts(c.get("entry_line"), 2)):
             out["entry_line"] = line
+        if c.get("kind") in ("gate", "inside") and c.get("rotate") in (0, 90, 180, 270):
+            out[f"rotate_{c['kind']}"] = int(c["rotate"])
     return out
 
 
 def apply(changes: dict[str, Any], cfg: Any, gate: Any, exit_gate: Any, body_exit: Any) -> list[str]:
     """Applies a plan to the live config + pipelines. Returns what changed (for the log)."""
     done: list[str] = []
+    for kind, sec in (("gate", cfg.gate if hasattr(cfg, "gate") else None), ("inside", cfg.inside)):
+        r = changes.get(f"rotate_{kind}")
+        if r is not None and sec is not None and sec.rotate != r:
+            sec.rotate = r
+            done.append(f"{'door' if kind == 'gate' else 'room'} rotation {r}")
     if "roi" in changes and [tuple(p) for p in cfg.inside.roi] != changes["roi"]:
         cfg.inside.roi = changes["roi"]
         done.append("seat area")

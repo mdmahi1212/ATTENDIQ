@@ -367,9 +367,11 @@ def main(argv: list[str] | None = None) -> int:
                 counter.reset()
             _, frame, _ = cam.latest()
             if frame is not None and gate.session_id is None and liveview and liveview.due("inside"):
-                from edge.liveview import caption_only  # camera test without a class: plain picture
+                from edge.liveview import draw_preview  # camera test without a class: faces + bodies, no names
 
-                liveview.update("inside", caption_only(rotate_frame(frame, cfg.inside.rotate), "room camera | no class running"))
+                test = rotate_frame(frame, cfg.inside.rotate)
+                liveview.update("inside", draw_preview(test, detect(test, cfg.exit.tiles), yolo(test),
+                                                       "room camera | camera test (no class: no names)"))
             if frame is not None and snaps.due("inside"):
                 snaps.offer("inside", rotate_frame(frame, cfg.inside.rotate))
             if frame is not None and gate.session_id is not None:
@@ -493,7 +495,6 @@ def main(argv: list[str] | None = None) -> int:
         if exit_gate:
             threading.Thread(target=exit_loop, args=(inside_cam, exit_gate), daemon=True, name="exit").start()
 
-    rotation = args.rotate if args.rotate is not None else cfg.gate.rotate
     # ------------------------------------------------------------ main loop
     last_seq, n = -1, 0
     next_body, last_bodies, door_yolo = 0.0, [], None
@@ -511,14 +512,20 @@ def main(argv: list[str] | None = None) -> int:
             if args.video and camera.ended and not args.demo:
                 time.sleep(2)  # let the last decisions publish
                 break
+            rotation = args.rotate if args.rotate is not None else cfg.gate.rotate  # the website may change it
             seq, frame, _ = camera.latest()
             if frame is not None and snaps.due("gate"):
                 snaps.offer("gate", rotate_frame(frame, rotation))
             if frame is not None and gate.session_id is None and liveview and liveview.due("gate"):
-                # Camera test without a class: show the plain picture (no detection runs, nothing is sent).
-                from edge.liveview import caption_only
+                # Camera test without a class: faces + bodies with scores, no names, nothing sent.
+                from edge.liveview import draw_preview
 
-                liveview.update("gate", caption_only(rotate_frame(frame, rotation), "door camera | no class running"))
+                test = rotate_frame(frame, rotation)
+                if door_yolo is None and cfg.gate.body_tracking:
+                    door_yolo = new_yolo()
+                preview_bodies = door_yolo(test) if door_yolo is not None else []
+                liveview.update("gate", draw_preview(test, detect(test), preview_bodies,
+                                                     "door camera | camera test (no class: no names)"))
             if frame is None or seq == last_seq or gate.session_id is None:
                 time.sleep(0.01)
                 continue

@@ -109,6 +109,8 @@ Manual way (same thing, two steps): `scripts\run-video-demo.ps1 -Door <door.mp4>
    Wi-Fi as the laptop**. No addresses to type: the laptop finds the phones by itself (searches every 2 minutes).
    Wrong way round (door shows the room)? Website: **Operator → Devices → edge-B204 → door / room camera → Use …**
    (or type the address the camera app shows). "Back to automatic" undoes it.
+   Picture sideways or upside down? Same page: **Turn it 0° / 90° / 180° / 270°** (applied within a minute).
+   Camera test without a class: http://127.0.0.1:8090 shows the picture with face + body boxes (names only in a class).
 2. Double-click **`START-CLASS.bat`** (project folder). By itself it:
    - checks both phone cameras (says which one is not reachable),
    - sends a picture from each camera to the website every 2 min (Operator → Devices → camera: draw the seat area,

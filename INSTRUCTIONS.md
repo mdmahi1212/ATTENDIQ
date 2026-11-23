@@ -177,6 +177,7 @@ Port 8000 is used by another program (bowlersense), so the face API runs on **80
 - Sync the Windows clock (Settings â†’ Time â†’ Sync now).
 
 ## Done
+- 2026-11-24: End session runs a final room check first; edge auto-restarts after a crash; only one edge per laptop.
 - 2026-11-23: deleted the 30 simulated students (+ their classes and records) and 2 test accounts; real people and the E2E test accounts kept.
 - 2026-11-23: cameras found automatically on the Wi-Fi; choose / type a camera on the website (no fixed addresses).
 - 2026-11-23: room camera marks attendance, back-row faces, two-camera exit, tap-your-seat verify, tidier admin, new dashboard panels.

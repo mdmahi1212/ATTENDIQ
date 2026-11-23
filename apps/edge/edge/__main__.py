@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import socket
 import ssl
 import threading
 import time
@@ -36,6 +37,22 @@ from edge.sources import is_auto
 
 log = logging.getLogger("edge")
 
+LOCK_PORT = 47811  # one edge per laptop: a second copy would fight over the cameras and send every event twice
+
+
+def single_instance_lock() -> socket.socket | None:
+    """Holds a local port while the edge runs; None if another edge already holds it."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)  # Windows: no port sharing
+    try:
+        s.bind(("127.0.0.1", LOCK_PORT))
+        s.listen(1)
+        return s
+    except OSError:
+        s.close()
+        return None
+
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="edge")
@@ -55,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
 
     env = Env()  # type: ignore[call-arg]
     cfg = load_yaml(env.edge_config_path)
+    lock = single_instance_lock()
+    if lock is None:
+        print("Another AttendIQ edge is already running on this laptop (one per room). Close it first.")
+        return 3
     fmt = '{"t":"%(asctime)s","lvl":"%(levelname)s","log":"%(name)s","msg":"%(message)s"}'
     logging.basicConfig(level=env.log_level, format=fmt)
     room = cfg.room_code or env.room_code
@@ -149,6 +170,22 @@ def main(argv: list[str] | None = None) -> int:
                                  lambda sid: _room_event(EventType.ROOM_SEEN, {"student_id": sid}),
                                  lambda score: _room_event(EventType.ROOM_UNKNOWN_FACE, {"best_score": score}),
                                  cfg.exit.min_face_px)
+
+    # Final room check (professor ends the class): ~30 s of bodies + faces, reported to the website.
+    from edge.finalcheck import FinalCheck
+
+    def _send_final(result: dict[str, Any]) -> None:
+        sid = gate.session_id
+        if sid is None:
+            return
+        try:
+            api.final_check(str(sid), result)
+            log.info("final room check sent: %s", result)
+        except EdgeApiError as e:
+            log.warning("final room check not sent: %s", e)
+
+    final = FinalCheck(gallery, gate.cfg.thresholds, _send_final)
+    final_seen: dict[str, str] = {}  # session -> last request handled
 
     from edge.geometry_sync import SnapshotSender
     from edge.geometry_sync import apply as apply_geometry
@@ -387,6 +424,9 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     boxes, ids = yolo(frame), None
                 kept = in_roi(boxes, cfg.inside.roi, frame.shape[1], frame.shape[0])
+                if final.running:
+                    final.bodies(len(kept), [body_exit.identity(i) for i in (ids or []) if i is not None] if body_exit else [],
+                                 time.monotonic())
                 people = room_people(boxes, ids, frame.shape[1], frame.shape[0],
                                      body_exit.identity if body_exit else None)
                 if t >= next_count or sample is None:
@@ -430,7 +470,7 @@ def main(argv: list[str] | None = None) -> int:
             if time.monotonic() < next_at:
                 stop.wait(0.01)
                 continue
-            next_at = time.monotonic() + 1.0 / max(0.5, cfg.exit.max_fps)
+            next_at = time.monotonic() + 1.0 / (4.0 if final.running else max(0.5, cfg.exit.max_fps))
             frame = rotate_frame(frame, cfg.inside.rotate)
             faces = detect(frame, cfg.exit.tiles)
             now = time.monotonic()
@@ -439,6 +479,8 @@ def main(argv: list[str] | None = None) -> int:
                 body_exit.faces(faces, now)
             if room_watch:
                 room_watch.update(faces, now)
+            if final.running:
+                final.faces(faces, now)
             if liveview and liveview.due("exit"):
                 from edge.liveview import draw_faces
 
@@ -456,10 +498,17 @@ def main(argv: list[str] | None = None) -> int:
                 sync_geometry()
             if now >= next_poll:
                 # demo: poll fast until the class is live, so the recordings start within ~2 s of the start
-                next_poll = now + (2 if args.demo and gate.session_id is None else cfg.control_poll_seconds)
+                # 2 s while a demo waits for its class; 5 s during a class (a final room check starts quickly)
+                next_poll = now + (2 if args.demo and gate.session_id is None else
+                                   5 if gate.session_id is not None else cfg.control_poll_seconds)
                 try:
                     s = api.current_session(room)
                     set_session(str(s["id"]) if s else None, "poll")
+                    req = (s or {}).get("final_check_requested_at")
+                    if s and req and final_seen.get(str(s["id"])) != req and not final.running:
+                        final_seen[str(s["id"])] = req
+                        final.start(time.monotonic())
+                        log.info("final room check started (professor ending the class)")
                 except EdgeApiError as e:
                     log.warning("session poll failed: %s", e)
                 if args.direct:

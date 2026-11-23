@@ -49,6 +49,10 @@ function Test-PyModule([string]$module) {
   [bool](Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -match "-m $module(\s|$)" })
 }
+# A part that crashes mid-class comes back by itself (close its window to stop it for good).
+function Get-Restarting([string]$command) {
+  "while (`$true) { $command; Write-Host 'stopped - restarting in 5 s (close this window to stop)' -ForegroundColor Yellow; Start-Sleep 5 }"
+}
 function Test-Port([int]$port) {
   [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
@@ -72,12 +76,12 @@ if (-not $NoFaceApi) {
   else { Start-Part "face-api" $repo "powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1 -Port $FaceApiPort" }
 }
 if (Test-PyModule "ingest") { Write-Host "ingest already running (reused)" }
-else { Start-Part "ingest" (Join-Path $repo "apps\ingest") ".\.venv\Scripts\python.exe -m ingest" }
+else { Start-Part "ingest" (Join-Path $repo "apps\ingest") (Get-Restarting ".\.venv\Scripts\python.exe -m ingest") }
 $edgeArgs = ""
 if ($Video) { $edgeArgs += " --video '$((Resolve-Path $Video).Path)'" }
 if ($Presence) { $edgeArgs += " --presence" }
 if (Test-PyModule "edge") { Write-Host "edge already running (reused)" }
-else { Start-Part "edge" (Join-Path $repo "apps\edge") ".\.venv\Scripts\python.exe -m edge$edgeArgs" }
+else { Start-Part "edge" (Join-Path $repo "apps\edge") (Get-Restarting ".\.venv\Scripts\python.exe -m edge$edgeArgs") }
 
 Write-Host ""
 Write-Host "Classroom stack starting (MQTT port $MqttPort). Watch the 'edge' window for 'session ... gallery N students'." -ForegroundColor Green

@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { check, formAction } from "@/lib/admin-action";
+import { endStep } from "@/lib/final-check";
 
 const sessionId = z.object({ session_id: z.guid() });
 
@@ -26,17 +27,41 @@ export const startRecheck = formAction({
   },
 });
 
+/**
+ * End session (user decision 2026-11-24): first a final room check (the edge looks at the room ~30 s: people count
+ * over many frames + recognised faces + body names) so the professor sees who is really there; pressing again
+ * (after the result, or with "End now") closes the class. Without a room camera online it closes straight away.
+ */
 export const endSession = formAction({
   roles: ["professor", "admin"],
-  schema: sessionId,
+  schema: sessionId.extend({ now: z.enum(["0", "1"]).default("0") }),
   revalidate: "/sessions",
-  run: async ({ session_id }, { supabase }) => {
+  run: async ({ session_id, now }, { supabase }) => {
+    if (now === "0") {
+      const { data: s } = check(
+        await supabase.from("class_sessions").select("state, room_id, final_check_requested_at, final_check_at").eq("id", session_id).single(),
+      );
+      if (!s) return { ok: false, message: "Class not found." };
+      const step = endStep(s.final_check_requested_at, s.final_check_at, Date.now());
+      if (s.state !== "ended" && step !== "close" && (await roomCameraOnline(s.room_id))) {
+        if (step === "check") check(await supabase.rpc("request_final_check", { p_session: session_id }));
+        return "Final room check running (about 40 s): the room camera counts and recognises everyone. The result appears on this page; then press End session again.";
+      }
+    }
     const { data } = check(await supabase.rpc("finalize_session", { p_session: session_id }));
     const r = data as { finalized?: boolean; absent?: number; needs_review?: number; unconfirmed?: number; reason?: string } | null;
     if (!r?.finalized) return { ok: false, message: `Not finalized (${r?.reason ?? "unknown"}).` };
     return `Session ended: ${r.absent ?? 0} absent, ${r.needs_review ?? 0} need review, ${r.unconfirmed ?? 0} not seen in the room.`;
   },
 });
+
+/** The room's edge sent a heartbeat in the last minute (it can run a final room check). */
+async function roomCameraOnline(roomId: string | null): Promise<boolean> {
+  if (!roomId) return false;
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { data } = await createAdminClient().from("edge_devices").select("last_seen").eq("room_id", roomId).eq("kind", "edge").eq("is_active", true);
+  return (data ?? []).some((d) => d.last_seen && Date.now() - Date.parse(d.last_seen) < 60_000);
+}
 
 export const manualMark = formAction({
   roles: ["professor", "admin"],

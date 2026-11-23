@@ -15,6 +15,8 @@ import { ageSeconds, fmtSeoul } from "@/lib/time";
 import { REASON_TEXT, type VerifyReason } from "@/lib/verify/decision";
 import { policyNum } from "@/lib/verify/server";
 import { endSession, sendVerifyRequest, startRecheck, writeClassSummary } from "./actions";
+import { parseFinalCheck } from "@/lib/final-check";
+import { FinalCheckPanel } from "./final-check-panel";
 import { LiveRefresh } from "./live-refresh";
 import { ManualMark } from "./manual-mark";
 
@@ -26,7 +28,7 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
   const supabase = await createClient();
   const { data: session } = await supabase
     .from("class_sessions")
-    .select("id, state, starts_at, ends_at, staff_count, policy, gate_offline_seconds, is_simulation, room_id, summary, summary_at, sections(section_no, courses(code, title)), rooms(code)")
+    .select("id, state, starts_at, ends_at, staff_count, policy, gate_offline_seconds, is_simulation, room_id, summary, summary_at, final_check, final_check_at, final_check_requested_at, sections(section_no, courses(code, title)), rooms(code)")
     .eq("id", id)
     .maybeSingle();
   if (!session) notFound(); // RLS: only staff of the section (or admin) can read it
@@ -166,9 +168,14 @@ export default async function LiveSessionPage({ params }: PageProps<"/sessions/[
           <Link href={`/sessions/${id}/qr`} target="_blank" className="inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium hover:bg-muted">
             Show room QR
           </Link>
-          <RowAction action={endSession} fields={{ session_id: id }} label="End session" variant="destructive" confirm="End and finalize this session now? Pending students become absent if the devices were healthy." />
+          <RowAction action={endSession} fields={{ session_id: id }} label="End session" variant="destructive"
+            confirm="End this class? First the room camera checks who is in the room (about 40 s); press End session again after the result." />
+          <RowAction action={endSession} fields={{ session_id: id, now: "1" }} label="End now without check" variant="outline"
+            confirm="Close the class right now, without a final room check? Pending students become absent if the devices were healthy." />
         </div>
       )}
+      {live && <FinalCheckPanel check={parseFinalCheck(session.final_check)} at={session.final_check_at}
+        requestedAt={session.final_check_requested_at} />}
       {!live && (
         <div className="mb-6 flex flex-wrap gap-2 print:hidden">
           <a href={`/api/sessions/${id}/export`} className="inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium hover:bg-muted">

@@ -148,3 +148,10 @@ Progress:
   Fixes: bodyexit._vote (each face votes for ONE body, head area; name needs >= 2x runner-up), migration
   20261123160306 (applied): after an OUT, return needs ROOM_SEEN / phone verify / staff, door alone only if no room
   camera that class (rolled-back test: jidan absent, Tanim present). Edge 82 tests. NOT re-run with the videos yet.
+- 2026-11-24 FINAL ROOM CHECK: migration 20261123161411 (applied): class_sessions.final_check_requested_at /
+  final_check / final_check_at, request_final_check() (staff), record_final_check() (service; compares with marks,
+  notifies staff), current_session_for_room returns the request. Edge finalcheck.py (30 s: median seated count,
+  faces >= 2 sightings, body names; room faces 4/s during the check), poll 5 s in class, POST
+  /api/edge/v1/sessions/[id]/final-check. Web: End session = request -> panel (auto refresh) -> End again closes;
+  'End now without check'; lib/final-check.ts endStep. Hardening: single edge lock (127.0.0.1:47811),
+  start-classroom restarts edge/ingest after a crash. Tests: edge 84, web 155. Rolled-back SQL test OK.

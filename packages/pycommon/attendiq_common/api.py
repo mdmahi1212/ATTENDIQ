@@ -79,6 +79,10 @@ class EdgeApi:
         """Edge only: start a short real demo class (5 / 10 / 15 min) for a section in this device's room."""
         return self._call("POST", "/sessions/demo-class", json={"section": section, "minutes": minutes}).json()
 
+    def final_check(self, session_id: str, result: dict[str, Any]) -> dict[str, Any]:
+        """Edge only: what the room camera saw in the final room check (the professor is ending the class)."""
+        return self._call("POST", f"/sessions/{session_id}/final-check", json=result).json()
+
     def cameras(self) -> list[dict[str, Any]]:
         """Edge only: camera geometry drawn on the website (Operator -> camera)."""
         return list(self._call("GET", "/cameras").json().get("cameras", []))

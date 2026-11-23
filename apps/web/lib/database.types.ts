@@ -295,6 +295,9 @@ export type Database = {
         Row: {
           cancelled_reason: string | null
           ends_at: string
+          final_check: Json | null
+          final_check_at: string | null
+          final_check_requested_at: string | null
           finalized_at: string | null
           gate_offline_seconds: number
           id: string
@@ -321,6 +324,9 @@ export type Database = {
         Insert: {
           cancelled_reason?: string | null
           ends_at: string
+          final_check?: Json | null
+          final_check_at?: string | null
+          final_check_requested_at?: string | null
           finalized_at?: string | null
           gate_offline_seconds?: number
           id?: string
@@ -347,6 +353,9 @@ export type Database = {
         Update: {
           cancelled_reason?: string | null
           ends_at?: string
+          final_check?: Json | null
+          final_check_at?: string | null
+          final_check_requested_at?: string | null
           finalized_at?: string | null
           gate_offline_seconds?: number
           id?: string
@@ -1503,6 +1512,8 @@ export type Database = {
         Returns: string
       }
       current_session_for_room: { Args: { p_room: string }; Returns: Json }
+      record_final_check: { Args: { p_result: Json; p_session: string }; Returns: Json }
+      request_final_check: { Args: { p_session: string }; Returns: string }
       decide_appeal: {
         Args: { p_appeal: string; p_approve: boolean; p_note: string }
         Returns: undefined

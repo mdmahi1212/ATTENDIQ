@@ -12,6 +12,8 @@ Accounts and passwords are NOT written here (this repo is public): use the ones 
    `powershell -ExecutionPolicy Bypass -File scripts\start-face-api.ps1`
 2. Each new person, on their own phone: open https://attendiq-rho.vercel.app → **Student sign up** → then
    **Face enrollment** (follow the camera steps) → turn **notifications on** when asked.
+   No email is sent (Supabase → Authentication → Email → "Confirm email" is OFF; the free email sender allows only a
+   few emails per hour). Forgot a password? Admin → People → one-time password link (no email).
 3. Admin (website): **Admin → Enrollments** → add all 5 to **IOT401-01**.
    Check **Admin → Face enrollment**: all 5 show **active**. (Mahi and Fahim are already done.)
 4. Decide who is **Person 1–5** (table below). Person 4 keeps their phone in their pocket during filming

@@ -1,15 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers";
-import { adminClient, E2E } from "./supabase-admin";
+import { adminClient, E2E, tempSimStudent } from "./supabase-admin";
 
 const ROOM = "40000000-0000-4000-8000-000000000001"; // B204 (seed)
-const SECTION = "50000000-0000-4000-8000-000000000001"; // IOT401-01, 30 simulated students
+const SECTION = "50000000-0000-4000-8000-000000000001"; // IOT401-01 (each test adds its own simulated student)
 const SIM_DEVICE = "e0000000-0000-4000-8000-000000000003";
-const sim = (n: number) => `5a000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
 
 test("professor live page: counters, roster, and a gate event appears without reload (Realtime)", async ({ page }) => {
   test.setTimeout(90_000);
   const admin = adminClient();
+  const sim = await tempSimStudent(admin, SECTION, "E2E Sim Student");
   // A simulation session that started 2 minutes ago (only simulated students get rows; nobody is notified).
   const { data: sessionId, error } = await admin.rpc("create_adhoc_session", {
     p_room: ROOM,
@@ -24,11 +24,11 @@ test("professor live page: counters, roster, and a gate event appears without re
     await page.goto(`/sessions/${sessionId}`);
     await expect(page.getByTestId("live-indicator")).toHaveAttribute("data-live", "true", { timeout: 20_000 });
     await expect(page.getByTestId("counter-Verified (V)")).toHaveText("0");
-    await expect(page.getByTestId("counter-Enrolled")).toHaveText("30");
-    const row = page.locator(`[data-student="${sim(7)}"]`);
+    await expect(page.getByTestId("counter-Enrolled")).toHaveText("1");
+    const row = page.locator(`[data-student="${sim.id}"]`);
     await expect(row).toContainText("Pending");
 
-    // The gate recognises Sim Student 07 now (same RPC the edge API uses).
+    // The gate recognises the simulated student now (same RPC the edge API uses).
     const { data: applied } = await admin.rpc("apply_edge_events", {
       p_device: SIM_DEVICE,
       p_events: [
@@ -38,7 +38,7 @@ test("professor live page: counters, roster, and a gate event appears without re
           source_device_id: SIM_DEVICE,
           session_id: sessionId,
           observed_at: new Date().toISOString(),
-          payload: { track_id: 1, student_id: sim(7), score: 0.71, margin: 0.3 },
+          payload: { track_id: 1, student_id: sim.id, score: 0.71, margin: 0.3 },
           simulation: true,
         },
       ],
@@ -55,12 +55,14 @@ test("professor live page: counters, roster, and a gate event appears without re
     await expect(page.getByTestId("room-qr").locator("svg")).toBeVisible({ timeout: 15_000 });
   } finally {
     await admin.from("class_sessions").update({ state: "cancelled", cancelled_reason: "e2e cleanup" }).eq("id", sessionId as string);
+    await sim.remove();
   }
 });
 
 test("Start recheck on the live page opens a recheck request for present students", async ({ page }) => {
   test.setTimeout(90_000);
   const admin = adminClient();
+  const sim = await tempSimStudent(admin, SECTION, "E2E Sim Student");
   const { data: sessionId, error } = await admin.rpc("create_adhoc_session", {
     p_room: ROOM,
     p_section: SECTION,
@@ -80,7 +82,7 @@ test("Start recheck on the live page opens a recheck request for present student
           source_device_id: SIM_DEVICE,
           session_id: sessionId,
           observed_at: new Date().toISOString(),
-          payload: { track_id: 1, student_id: sim(3), score: 0.7, margin: 0.3 },
+          payload: { track_id: 1, student_id: sim.id, score: 0.7, margin: 0.3 },
           simulation: true,
         },
       ],
@@ -113,6 +115,7 @@ test("Start recheck on the live page opens a recheck request for present student
     expect(reqs).toEqual([{ kind: "recheck", status: "open" }]);
   } finally {
     await admin.from("class_sessions").update({ state: "cancelled", cancelled_reason: "e2e cleanup" }).eq("id", sessionId as string);
+    await sim.remove();
   }
 });
 

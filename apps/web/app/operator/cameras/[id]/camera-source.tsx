@@ -1,3 +1,5 @@
+"use client";
+
 import { Wifi } from "lucide-react";
 import { ActionForm, RowAction, SubmitButton, TextField } from "@/components/form";
 import { setCameraRotation, setCameraStream } from "../../actions";

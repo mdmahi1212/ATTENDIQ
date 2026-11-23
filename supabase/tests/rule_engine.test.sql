@@ -339,22 +339,22 @@ select tests.apply(jsonb_build_array(
 select public.finalize_session(tests.sid(20), tests.t(20, 75));
 insert into tap(line) select is(tests.st(tests.sid(20), tests.s(1)), 'present', 'head down but the count says everyone is there -> present');
 
--- ============================================================ H: the door marks attendance only in the first 15 minutes
-select tests.session(22);
+-- ============================================================ H: the door marks attendance only in the first 17% (75 min -> 12.75)
+select tests.session(18);
 select tests.apply(jsonb_build_array(
-  tests.rec(tests.sid(22), tests.s(1), tests.t(22, 12)),
-  tests.rec(tests.sid(22), tests.s(2), tests.t(22, 20)),
-  tests.rec(tests.sid(22), tests.s(3), tests.t(22, 5)),
-  tests.ev('GATE_PERSON_OUT', tests.sid(22), tests.t(22, 30), jsonb_build_object('track_id', 4, 'student_id', tests.s(3))),
-  tests.rec(tests.sid(22), tests.s(3), tests.t(22, 40)),
-  tests.ev('ROOM_SEEN', tests.sid(22), tests.t(22, 22), jsonb_build_object('student_id', tests.s(4)))));
-insert into tap(line) select is(tests.st(tests.sid(22), tests.s(1)), 'late', 'door at 12 min (before 15) -> marked late');
-insert into tap(line) select is(tests.st(tests.sid(22), tests.s(2)), 'pending', 'door at 20 min (after 15) -> not marked by the door');
-insert into tap(line) select ok(exists (select 1 from public.gate_events where session_id = tests.sid(22) and student_id = tests.s(2)),
+  tests.rec(tests.sid(18), tests.s(1), tests.t(18, 12)),
+  tests.rec(tests.sid(18), tests.s(2), tests.t(18, 20)),
+  tests.rec(tests.sid(18), tests.s(3), tests.t(18, 5)),
+  tests.ev('GATE_PERSON_OUT', tests.sid(18), tests.t(18, 30), jsonb_build_object('track_id', 4, 'student_id', tests.s(3))),
+  tests.rec(tests.sid(18), tests.s(3), tests.t(18, 40)),
+  tests.ev('ROOM_SEEN', tests.sid(18), tests.t(18, 22), jsonb_build_object('student_id', tests.s(4)))));
+insert into tap(line) select is(tests.st(tests.sid(18), tests.s(1)), 'late', 'door at 12 min (before 12.75) -> marked late');
+insert into tap(line) select is(tests.st(tests.sid(18), tests.s(2)), 'pending', 'door at 20 min (after 12.75) -> not marked by the door');
+insert into tap(line) select ok(exists (select 1 from public.gate_events where session_id = tests.sid(18) and student_id = tests.s(2)),
   'the 20-min door sighting is still stored');
-insert into tap(line) select ok('reentry' = any((tests.att(tests.sid(22), tests.s(3))).flags), 'marked student back at 40 min -> reentry still works');
-insert into tap(line) select is(tests.st(tests.sid(22), tests.s(3)), 'present', 're-entered student stays present');
-insert into tap(line) select is(tests.st(tests.sid(22), tests.s(4)), 'late', 'room camera at 22 min still marks (late)');
+insert into tap(line) select ok('reentry' = any((tests.att(tests.sid(18), tests.s(3))).flags), 'marked student back at 40 min -> reentry still works');
+insert into tap(line) select is(tests.st(tests.sid(18), tests.s(3)), 'present', 're-entered student stays present');
+insert into tap(line) select is(tests.st(tests.sid(18), tests.s(4)), 'late', 'room camera at 22 min still marks (late)');
 
 -- ============================================================ F: gate camera offline -> pending, not absent
 select tests.session(5);

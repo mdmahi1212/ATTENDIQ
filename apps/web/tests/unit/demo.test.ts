@@ -13,7 +13,7 @@ describe("demo class timing", () => {
   });
 
   it("uses the agreed 10-minute timing", () => {
-    expect(demoPolicy(10)).toMatchObject({ present_until_min: 2, late_until_min: 8, door_marks_until_min: 8, mismatch_interval_min: 2, recheck_before_end_min: 3 });
+    expect(demoPolicy(10)).toMatchObject({ present_until_min: 2, late_until_min: 8, mismatch_interval_min: 2, recheck_before_end_min: 3 });
     expect(describeDemo(10)).toContain("professor alert at 7 min");
   });
 

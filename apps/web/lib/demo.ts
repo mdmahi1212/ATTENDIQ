@@ -11,7 +11,6 @@ export const FULL_CLASS_DEFAULT_MIN = 75;
 export type DemoPolicy = {
   present_until_min: number;
   late_until_min: number;
-  door_marks_until_min: number;
   first_mismatch_check_min: number;
   mismatch_interval_min: number;
   count_tolerance: number;
@@ -28,7 +27,6 @@ export function demoPolicy(minutes: number): DemoPolicy {
   return {
     present_until_min: step, // 5 -> 1, 10 -> 2, 15 -> 3
     late_until_min: Math.round(m * 0.8), // 5 -> 4, 10 -> 8, 15 -> 12
-    door_marks_until_min: Math.round(m * 0.8), // a real class: 15 of 75 min; demos keep the door on until 'late until'
     first_mismatch_check_min: step,
     mismatch_interval_min: step,
     count_tolerance: 0, // with 2-5 people one hidden face must already trigger "verify now"

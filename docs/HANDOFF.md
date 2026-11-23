@@ -169,3 +169,6 @@ Progress:
   the key to settings.policy): later door sightings are stored and still give reentry / return-after-OUT, but do not
   mark unmarked students (room camera / phone do). Web: policySchema key (default 15), settings form field, demo table
   row. SQL test H (6 checks pass, rolled back); web 155 unit tests, lint, typecheck OK.
+- 2026-11-24 DOOR CUTOFF CHANGED to 17% of the class time, demo and live alike (user): migration 20261123164340
+  (applied) -> policy door_marks_until_pct (default 17), door_marks_until_min removed. Web: setting is a %, demos have
+  no override (Admin -> Demo table shows m*0.17).

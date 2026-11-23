@@ -83,8 +83,8 @@ describe("zod schemas", () => {
 
   it("the seeded default policy is valid; inconsistent policies are rejected", () => {
     expect(policySchema.safeParse(DEFAULT_POLICY).success).toBe(true);
-    expect(policySchema.parse(DEFAULT_POLICY).door_marks_until_min).toBe(15); // older saved policies get the default
-    expect(policySchema.safeParse({ ...DEFAULT_POLICY, door_marks_until_min: 0 }).success).toBe(false);
+    expect(policySchema.parse(DEFAULT_POLICY).door_marks_until_pct).toBe(17); // older saved policies get the default
+    expect(policySchema.safeParse({ ...DEFAULT_POLICY, door_marks_until_pct: 0 }).success).toBe(false);
     expect(policySchema.safeParse({ ...DEFAULT_POLICY, late_until_min: 5 }).success).toBe(false);
     expect(policySchema.safeParse({ ...DEFAULT_POLICY, warn_attendance_pct: [70, 85] }).success).toBe(false);
     expect(policySchema.safeParse({ ...DEFAULT_POLICY, verify_threshold: 1.5 }).success).toBe(false);
